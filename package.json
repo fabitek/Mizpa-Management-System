@@ -1,0 +1,13 @@
+{
+  "name": "mizpa-management-system",
+  "version": "1.0.0",
+  "description": "Pure Core Domain for Soccer Match Management and Financial Settlement System",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/**/*.test.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
