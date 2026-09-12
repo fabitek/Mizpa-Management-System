@@ -24,6 +24,7 @@ export interface Match {
   maxPlayers: number;
   settledFeePerPlayer: number | null;
   status: MatchStatus;
+  mvpPlayerId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,6 +45,8 @@ export interface Attendance {
   playerId: string;
   status: AttendanceStatus;
   registeredAt: Date;
+  registeredByPlayerId?: string;
+  guestName?: string;
 }
 
 export interface FinancialEntry {
@@ -64,4 +67,47 @@ export interface GoalEvent {
   playerId: string;
   minute?: number;
   type: GoalType;
+  createdAt?: Date;
+}
+
+export type BadgeCode =
+  | 'PICHICHI'
+  | 'IRON_MAN'
+  | 'HAT_TRICK_HERO'
+  | 'FIEL_MIZPA'
+  | 'FAIR_PLAY_SOLVENT';
+
+export interface PlayerBadge {
+  code: BadgeCode;
+  title: string;
+  description: string;
+  icon: string;
+  unlocked: boolean;
+  unlockedAt?: Date;
+}
+
+export interface PlayerPerformanceStats {
+  playerId: string;
+  matchesPlayed: number;
+  goalsCount: number;
+  ownGoalsCount: number;
+  goalsBreakdown: {
+    openPlay: number;
+    penalty: number;
+    ownGoal: number;
+  };
+  goalsPerMatchRatio: number;
+  currentAttendanceStreak: number;
+  bestAttendanceStreak: number;
+  mvpCount: number;
+  badges: PlayerBadge[];
+}
+
+export interface TopScorerEntry {
+  playerId: string;
+  goals: number;
+  matchesPlayed: number;
+  ratio: number;
+  penalties: number;
+  openPlayGoals: number;
 }

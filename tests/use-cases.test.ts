@@ -43,15 +43,34 @@ export class InMemoryMatchRepository implements IMatchRepository {
     }
     this.matches.set(match.id, { ...match });
   }
+
+  async findAll(): Promise<Match[]> {
+    return Array.from(this.matches.values()).map((m) => ({ ...m }));
+  }
 }
 
 export class InMemoryAttendanceRepository implements IAttendanceRepository {
   public attendances: Attendance[] = [];
 
+  async findById(id: string): Promise<Attendance | null> {
+    const attendance = this.attendances.find((a) => a.id === id);
+    return attendance ? { ...attendance } : null;
+  }
+
   async findByMatchId(matchId: string): Promise<Attendance[]> {
     return this.attendances
       .filter((a) => a.matchId === matchId)
       .map((a) => ({ ...a }));
+  }
+
+  async findByPlayerId(playerId: string): Promise<Attendance[]> {
+    return this.attendances
+      .filter((a) => a.playerId === playerId || a.registeredByPlayerId === playerId)
+      .map((a) => ({ ...a }));
+  }
+
+  async findAll(): Promise<Attendance[]> {
+    return this.attendances.map((a) => ({ ...a }));
   }
 
   async save(attendance: Attendance): Promise<void> {
@@ -82,6 +101,16 @@ export class InMemoryFinanceRepository implements IFinanceRepository {
     return this.entries
       .filter((e) => e.playerId === playerId)
       .map((e) => ({ ...e }));
+  }
+
+  async getEntriesByMatchId(matchId: string): Promise<FinancialEntry[]> {
+    return this.entries
+      .filter((e) => e.matchId === matchId)
+      .map((e) => ({ ...e }));
+  }
+
+  async getAllEntries(): Promise<FinancialEntry[]> {
+    return this.entries.map((e) => ({ ...e }));
   }
 
   async getPlayerBalance(playerId: string): Promise<number> {

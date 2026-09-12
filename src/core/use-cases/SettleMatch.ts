@@ -79,14 +79,19 @@ export class SettleMatchUseCase {
         ? this.idGenerator()
         : `entry-${match.id}-${attendee.playerId}-${Date.now()}-${index}`;
 
+      const targetPlayerId = attendee.registeredByPlayerId ?? attendee.playerId;
+      const note = attendee.guestName
+        ? `Liquidación de partido ${match.id} (Invitado +1: ${attendee.guestName})`
+        : `Liquidación de partido ${match.id} (${match.location})`;
+
       return {
         id: entryId,
-        playerId: attendee.playerId,
+        playerId: targetPlayerId,
         matchId: match.id,
         type: 'DEBIT',
         amount: feePerPlayer,
         referenceDate,
-        note: `Liquidación de partido ${match.id} (${match.location})`,
+        note,
         createdAt: new Date(),
       };
     });
