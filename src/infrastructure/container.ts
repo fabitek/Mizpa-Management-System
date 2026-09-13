@@ -4,11 +4,15 @@ import type {
   IAttendanceRepository,
   IFinanceRepository,
   IGoalRepository,
+  IAuthService,
+  INotificationService,
 } from '../core/domain/index.ts';
 import { InMemoryMatchRepository } from './repositories/in-memory/InMemoryMatchRepository.ts';
 import { InMemoryAttendanceRepository } from './repositories/in-memory/InMemoryAttendanceRepository.ts';
 import { InMemoryFinanceRepository } from './repositories/in-memory/InMemoryFinanceRepository.ts';
 import { InMemoryGoalRepository } from './repositories/in-memory/InMemoryGoalRepository.ts';
+import { InMemoryAuthService } from './repositories/in-memory/InMemoryAuthService.ts';
+import { InMemoryNotificationService } from './repositories/in-memory/InMemoryNotificationService.ts';
 import {
   SupabaseMatchRepository,
   SupabaseAttendanceRepository,
@@ -32,8 +36,13 @@ import {
   GetPlayerStatsUseCase,
   AssignMatchMvpUseCase,
   GetLeaderboardOverviewUseCase,
+  SendMatchConvocationUseCase,
+  SendSettlementAlertsUseCase,
+  SendDebtReminderUseCase,
+  GetNotificationsLogUseCase,
+  SwitchSessionUserUseCase,
 } from '../core/use-cases/index.ts';
-import { initialMatch, initialAttendances, initialGoals } from './seed-data.ts';
+import { initialMatch, initialAttendances, initialGoals, initialNotifications, initialPlayers } from './seed-data.ts';
 
 // Singleton container interface typed to domain interfaces (Ports)
 export interface DIContainer {
@@ -42,6 +51,8 @@ export interface DIContainer {
   attendanceRepository: IAttendanceRepository;
   financeRepository: IFinanceRepository;
   goalRepository: IGoalRepository;
+  authService: IAuthService;
+  notificationService: INotificationService;
   settleMatchUseCase: SettleMatchUseCase;
   calculateMatchFeeUseCase: CalculateMatchFeeUseCase;
   createMatchUseCase: CreateMatchUseCase;
@@ -58,6 +69,11 @@ export interface DIContainer {
   getPlayerStatsUseCase: GetPlayerStatsUseCase;
   assignMatchMvpUseCase: AssignMatchMvpUseCase;
   getLeaderboardOverviewUseCase: GetLeaderboardOverviewUseCase;
+  sendMatchConvocationUseCase: SendMatchConvocationUseCase;
+  sendSettlementAlertsUseCase: SendSettlementAlertsUseCase;
+  sendDebtReminderUseCase: SendDebtReminderUseCase;
+  getNotificationsLogUseCase: GetNotificationsLogUseCase;
+  switchSessionUserUseCase: SwitchSessionUserUseCase;
 }
 
 // Preserve singletons in development / serverless context
@@ -74,6 +90,8 @@ function createContainer(): DIContainer {
   let attendanceRepository: IAttendanceRepository;
   let financeRepository: IFinanceRepository;
   let goalRepository: IGoalRepository;
+  let authService: IAuthService;
+  let notificationService: INotificationService;
   let activeDataSource: 'in-memory' | 'supabase' = 'in-memory';
 
   if (dataSource === 'supabase' && supabaseUrl && supabaseKey) {
@@ -86,6 +104,8 @@ function createContainer(): DIContainer {
       attendanceRepository = new SupabaseAttendanceRepository(client);
       financeRepository = new SupabaseFinanceRepository(client);
       goalRepository = new SupabaseGoalRepository(client);
+      authService = new InMemoryAuthService(initialPlayers);
+      notificationService = new InMemoryNotificationService(initialNotifications);
       activeDataSource = 'supabase';
     } catch (err) {
       console.warn(
@@ -96,12 +116,16 @@ function createContainer(): DIContainer {
       attendanceRepository = new InMemoryAttendanceRepository(initialAttendances);
       financeRepository = new InMemoryFinanceRepository();
       goalRepository = new InMemoryGoalRepository(initialGoals);
+      authService = new InMemoryAuthService(initialPlayers);
+      notificationService = new InMemoryNotificationService(initialNotifications);
     }
   } else {
     matchRepository = new InMemoryMatchRepository([initialMatch]);
     attendanceRepository = new InMemoryAttendanceRepository(initialAttendances);
     financeRepository = new InMemoryFinanceRepository();
     goalRepository = new InMemoryGoalRepository(initialGoals);
+    authService = new InMemoryAuthService(initialPlayers);
+    notificationService = new InMemoryNotificationService(initialNotifications);
   }
 
   const settleMatchUseCase = new SettleMatchUseCase(
@@ -152,12 +176,31 @@ function createContainer(): DIContainer {
     matchRepository
   );
 
+  const sendMatchConvocationUseCase = new SendMatchConvocationUseCase(
+    matchRepository,
+    notificationService
+  );
+  const sendSettlementAlertsUseCase = new SendSettlementAlertsUseCase(
+    matchRepository,
+    attendanceRepository,
+    financeRepository,
+    notificationService
+  );
+  const sendDebtReminderUseCase = new SendDebtReminderUseCase(
+    financeRepository,
+    notificationService
+  );
+  const getNotificationsLogUseCase = new GetNotificationsLogUseCase(notificationService);
+  const switchSessionUserUseCase = new SwitchSessionUserUseCase(authService);
+
   return {
     dataSource: activeDataSource,
     matchRepository,
     attendanceRepository,
     financeRepository,
     goalRepository,
+    authService,
+    notificationService,
     settleMatchUseCase,
     calculateMatchFeeUseCase,
     createMatchUseCase,
@@ -174,6 +217,11 @@ function createContainer(): DIContainer {
     getPlayerStatsUseCase,
     assignMatchMvpUseCase,
     getLeaderboardOverviewUseCase,
+    sendMatchConvocationUseCase,
+    sendSettlementAlertsUseCase,
+    sendDebtReminderUseCase,
+    getNotificationsLogUseCase,
+    switchSessionUserUseCase,
   };
 }
 
@@ -189,6 +237,8 @@ export const {
   attendanceRepository,
   financeRepository,
   goalRepository,
+  authService,
+  notificationService,
   settleMatchUseCase,
   calculateMatchFeeUseCase,
   createMatchUseCase,
@@ -205,4 +255,9 @@ export const {
   getPlayerStatsUseCase,
   assignMatchMvpUseCase,
   getLeaderboardOverviewUseCase,
+  sendMatchConvocationUseCase,
+  sendSettlementAlertsUseCase,
+  sendDebtReminderUseCase,
+  getNotificationsLogUseCase,
+  switchSessionUserUseCase,
 } = container;

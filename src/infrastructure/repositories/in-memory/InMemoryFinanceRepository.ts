@@ -1,18 +1,31 @@
 import type { FinancialEntry, IFinanceRepository } from '../../../core/domain/index.ts';
+import { loadDB, saveDB } from './FileDB.ts';
 
 export class InMemoryFinanceRepository implements IFinanceRepository {
   private entries: FinancialEntry[];
 
   constructor(initialEntries: FinancialEntry[] = []) {
-    this.entries = initialEntries.map((e) => ({ ...e }));
+    const db = loadDB();
+    if (db && db.financialEntries && db.financialEntries.length > 0) {
+      this.entries = db.financialEntries.map((e) => ({ ...e }));
+    } else {
+      this.entries = initialEntries.map((e) => ({ ...e }));
+      saveDB({ financialEntries: this.entries });
+    }
+  }
+
+  private persist() {
+    saveDB({ financialEntries: this.entries });
   }
 
   async recordEntry(entry: FinancialEntry): Promise<void> {
     this.entries.push({ ...entry });
+    this.persist();
   }
 
   async recordBatchEntries(entries: FinancialEntry[]): Promise<void> {
     this.entries.push(...entries.map((e) => ({ ...e })));
+    this.persist();
   }
 
   async getEntriesByPlayerId(playerId: string): Promise<FinancialEntry[]> {

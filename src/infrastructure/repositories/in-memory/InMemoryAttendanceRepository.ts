@@ -1,10 +1,21 @@
 import type { Attendance, IAttendanceRepository } from '../../../core/domain/index.ts';
+import { loadDB, saveDB } from './FileDB.ts';
 
 export class InMemoryAttendanceRepository implements IAttendanceRepository {
   private attendances: Attendance[];
 
   constructor(initialAttendances: Attendance[] = []) {
-    this.attendances = initialAttendances.map((a) => ({ ...a }));
+    const db = loadDB();
+    if (db && db.attendances && db.attendances.length > 0) {
+      this.attendances = db.attendances.map((a) => ({ ...a }));
+    } else {
+      this.attendances = initialAttendances.map((a) => ({ ...a }));
+      saveDB({ attendances: this.attendances });
+    }
+  }
+
+  private persist() {
+    saveDB({ attendances: this.attendances });
   }
 
   async findById(id: string): Promise<Attendance | null> {
@@ -26,6 +37,7 @@ export class InMemoryAttendanceRepository implements IAttendanceRepository {
 
   async save(attendance: Attendance): Promise<void> {
     this.attendances.push({ ...attendance });
+    this.persist();
   }
 
   async update(attendance: Attendance): Promise<void> {
@@ -34,6 +46,7 @@ export class InMemoryAttendanceRepository implements IAttendanceRepository {
       throw new Error(`Attendance with ID '${attendance.id}' not found.`);
     }
     this.attendances[index] = { ...attendance };
+    this.persist();
   }
 
   // Helper for UI/testing

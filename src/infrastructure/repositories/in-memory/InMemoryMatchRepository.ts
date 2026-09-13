@@ -1,10 +1,21 @@
 import type { Match, IMatchRepository } from '../../../core/domain/index.ts';
+import { loadDB, saveDB } from './FileDB.ts';
 
 export class InMemoryMatchRepository implements IMatchRepository {
   private matches: Map<string, Match>;
 
   constructor(initialMatches: Match[] = []) {
-    this.matches = new Map(initialMatches.map((m) => [m.id, { ...m }]));
+    const db = loadDB();
+    if (db && db.matches && db.matches.length > 0) {
+      this.matches = new Map(db.matches.map((m) => [m.id, { ...m }]));
+    } else {
+      this.matches = new Map(initialMatches.map((m) => [m.id, { ...m }]));
+      saveDB({ matches: Array.from(this.matches.values()) });
+    }
+  }
+
+  private persist() {
+    saveDB({ matches: Array.from(this.matches.values()) });
   }
 
   async findById(id: string): Promise<Match | null> {
@@ -14,6 +25,7 @@ export class InMemoryMatchRepository implements IMatchRepository {
 
   async save(match: Match): Promise<void> {
     this.matches.set(match.id, { ...match });
+    this.persist();
   }
 
   async update(match: Match): Promise<void> {
@@ -21,6 +33,7 @@ export class InMemoryMatchRepository implements IMatchRepository {
       throw new Error(`Match with ID '${match.id}' not found in repository.`);
     }
     this.matches.set(match.id, { ...match });
+    this.persist();
   }
 
   // Helper for UI/testing

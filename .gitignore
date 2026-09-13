@@ -47,3 +47,7 @@ Thumbs.db
 # logs
 logs
 *.log
+.next-dev.log
+
+# local database
+.mizpa-db.json

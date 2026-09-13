@@ -69,3 +69,19 @@ export class GoalNotFoundError extends Error {
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
+
+export class UnauthorizedError extends Error {
+  constructor(message: string = 'Unauthorized: Insufficient permissions for this action.') {
+    super(message);
+    this.name = 'UnauthorizedError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export class NotificationDeliveryError extends Error {
+  constructor(message: string = 'Failed to deliver notification.') {
+    super(message);
+    this.name = 'NotificationDeliveryError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}

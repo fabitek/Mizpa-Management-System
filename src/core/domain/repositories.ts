@@ -1,4 +1,12 @@
-import type { Match, Attendance, FinancialEntry, GoalEvent } from './types.ts';
+import type {
+  Match,
+  Attendance,
+  FinancialEntry,
+  GoalEvent,
+  AuthSession,
+  UserRole,
+  NotificationMessage,
+} from './types.ts';
 
 export interface IMatchRepository {
   findById(id: string): Promise<Match | null>;
@@ -31,4 +39,22 @@ export interface IGoalRepository {
   findByPlayerId(playerId: string): Promise<GoalEvent[]>;
   getAll(): Promise<GoalEvent[]>;
   deleteGoal(id: string): Promise<void>;
+}
+
+export interface IAuthService {
+  getCurrentSession(): Promise<AuthSession | null>;
+  switchUser(playerId: string): Promise<AuthSession>;
+  checkPermission(userRole: UserRole, requiredRole: UserRole): boolean;
+}
+
+export interface INotificationService {
+  sendNotification(
+    msg: Omit<NotificationMessage, 'id' | 'createdAt' | 'status'>
+  ): Promise<NotificationMessage>;
+  sendBatchNotifications(
+    msgs: Omit<NotificationMessage, 'id' | 'createdAt' | 'status'>[]
+  ): Promise<NotificationMessage[]>;
+  findByPlayerId(playerId: string): Promise<NotificationMessage[]>;
+  getAll(): Promise<NotificationMessage[]>;
+  generateWhatsAppLink(phone: string, messageText: string): string;
 }

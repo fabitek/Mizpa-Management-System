@@ -19,6 +19,8 @@ export interface Match {
   id: string;
   date: Date;
   location: string;
+  locationAddress?: string;
+  googleMapsUrl?: string;
   pitchRentalCost: number;
   extraCosts: number;
   maxPlayers: number;
@@ -29,12 +31,15 @@ export interface Match {
   updatedAt: Date;
 }
 
+export type UserRole = 'ADMIN' | 'CAPTAIN' | 'PLAYER';
+
 export interface Player {
   id: string;
   fullName: string;
   email: string;
   phone?: string;
   alias?: string;
+  role?: UserRole;
   isActive: boolean;
   createdAt: Date;
 }
@@ -110,4 +115,38 @@ export interface TopScorerEntry {
   ratio: number;
   penalties: number;
   openPlayGoals: number;
+}
+
+export interface AuthSession {
+  user: {
+    id: string;
+    email: string;
+    role: UserRole;
+    playerId: string;
+    fullName: string;
+  };
+}
+
+export type NotificationChannel = 'WHATSAPP' | 'EMAIL' | 'IN_APP';
+
+export type NotificationType =
+  | 'MATCH_CONVOCATION'
+  | 'RSVP_CONFIRMATION'
+  | 'WAITLIST_PROMOTION'
+  | 'MATCH_SETTLED_FEE'
+  | 'DEBT_REMINDER';
+
+export interface NotificationMessage {
+  id: string;
+  recipientPlayerId: string;
+  recipientPhone?: string;
+  recipientEmail?: string;
+  channel: NotificationChannel;
+  type: NotificationType;
+  title: string;
+  content: string;
+  actionUrl?: string;
+  status: 'PENDING' | 'SENT' | 'FAILED';
+  sentAt?: Date;
+  createdAt: Date;
 }

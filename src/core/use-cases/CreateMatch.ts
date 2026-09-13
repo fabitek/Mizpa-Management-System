@@ -4,6 +4,8 @@ export interface CreateMatchInput {
   id?: string;
   date: Date;
   location: string;
+  locationAddress?: string;
+  googleMapsUrl?: string;
   pitchRentalCost: number;
   extraCosts: number;
   maxPlayers: number;
@@ -27,6 +29,7 @@ export class CreateMatchUseCase {
       id,
       date,
       location,
+      locationAddress,
       pitchRentalCost,
       extraCosts,
       maxPlayers,
@@ -54,10 +57,26 @@ export class CreateMatchUseCase {
     const status: MatchStatus = openImmediately ? 'OPEN_REGISTRATION' : 'DRAFT';
     const now = new Date();
 
+    // Clean emojis and symbols for search query
+    const cleanLocation = location.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+    const cleanAddress = locationAddress ? locationAddress.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim() : '';
+    
+    // Prefer searching for the address + location name or address
+    const fullLocationQuery = cleanAddress
+      ? `${cleanAddress} ${cleanLocation}`.trim()
+      : cleanLocation;
+
+    const computedGoogleMapsUrl =
+      input.googleMapsUrl && input.googleMapsUrl.trim().length > 0
+        ? input.googleMapsUrl.trim()
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullLocationQuery || location.trim())}`;
+
     const newMatch: Match = {
       id: matchId,
       date,
       location: location.trim(),
+      locationAddress: locationAddress ? locationAddress.trim() : undefined,
+      googleMapsUrl: computedGoogleMapsUrl,
       pitchRentalCost,
       extraCosts,
       maxPlayers,

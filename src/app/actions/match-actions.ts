@@ -1,11 +1,17 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { settleMatchUseCase } from '../../infrastructure/container.ts';
+import {
+  settleMatchUseCase,
+  createMatchUseCase,
+  openMatchRegistrationUseCase,
+  matchRepository,
+} from '../../infrastructure/container.ts';
 import {
   MatchAlreadySettledError,
   InvalidAttendanceStateError,
   InvalidFinancialAmountError,
+  type Match,
 } from '../../core/domain/index.ts';
 
 export interface SettleMatchActionResult {
@@ -21,6 +27,13 @@ export interface SettleMatchActionResult {
   errorCode?: string;
 }
 
+export interface CreateMatchActionResult {
+  success: boolean;
+  message: string;
+  data?: Match;
+  errorCode?: string;
+}
+
 export async function settleMatchAction(
   matchId: string
 ): Promise<SettleMatchActionResult> {
@@ -28,10 +41,12 @@ export async function settleMatchAction(
     const result = await settleMatchUseCase.execute({ matchId });
 
     revalidatePath('/matches');
+    revalidatePath('/wallet');
+    revalidatePath('/notifications');
 
     return {
       success: true,
-      message: `Partido liquidado con éxito. Cuota congelada: $${result.settledFeePerPlayer.toLocaleString()} por jugador.`,
+      message: `Partido liquidado con éxito. Cuota congelada: $${result.settledFeePerPlayer.toLocaleString('es-CO')} por jugador.`,
       data: {
         matchId: result.match.id,
         settledFeePerPlayer: result.settledFeePerPlayer,
@@ -72,6 +87,91 @@ export async function settleMatchAction(
       success: false,
       message: genericMessage,
       errorCode: 'UNKNOWN_ERROR',
+    };
+  }
+}
+
+export async function createMatchAction(input: {
+  location: string;
+  locationAddress?: string;
+  googleMapsUrl?: string;
+  date: string;
+  pitchRentalCost: number;
+  extraCosts: number;
+  maxPlayers?: number;
+  openImmediately?: boolean;
+}): Promise<CreateMatchActionResult> {
+  try {
+    const parsedDate = new Date(input.date);
+    if (isNaN(parsedDate.getTime())) {
+      return {
+        success: false,
+        message: 'Fecha y hora del partido no válidas.',
+        errorCode: 'INVALID_DATE',
+      };
+    }
+
+    const newMatch = await createMatchUseCase.execute({
+      location: input.location,
+      locationAddress: input.locationAddress,
+      googleMapsUrl: input.googleMapsUrl,
+      date: parsedDate,
+      pitchRentalCost: Number(input.pitchRentalCost) || 0,
+      extraCosts: Number(input.extraCosts) || 0,
+      maxPlayers: Number(input.maxPlayers) || 18,
+      openImmediately: input.openImmediately ?? true,
+    });
+
+    revalidatePath('/matches');
+    revalidatePath('/notifications');
+    revalidatePath(`/rsvp/${newMatch.id}`);
+
+    return {
+      success: true,
+      message: `¡Partido en ${newMatch.location} creado exitosamente con cupo de ${newMatch.maxPlayers} jugadores!`,
+      data: newMatch,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al crear el partido.',
+      errorCode: 'CREATE_MATCH_ERROR',
+    };
+  }
+}
+
+export async function getAllMatchesAction(): Promise<{ success: boolean; data: Match[] }> {
+  try {
+    const matches = await matchRepository.findAll();
+    return {
+      success: true,
+      data: matches,
+    };
+  } catch {
+    return {
+      success: false,
+      data: [],
+    };
+  }
+}
+
+export async function openMatchRegistrationAction(
+  matchId: string
+): Promise<{ success: boolean; message: string; data?: Match }> {
+  try {
+    const match = await openMatchRegistrationUseCase.execute({ matchId });
+    revalidatePath('/matches');
+    revalidatePath('/notifications');
+    revalidatePath(`/rsvp/${matchId}`);
+    return {
+      success: true,
+      message: `Inscripciones abiertas con éxito para ${match.location}.`,
+      data: match,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al abrir inscripciones.',
     };
   }
 }

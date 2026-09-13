@@ -19,6 +19,7 @@ import {
   calculateMatchFee,
   CalculateMatchFeeUseCase,
   SettleMatchUseCase,
+  CreateMatchUseCase,
 } from '../src/core/use-cases/index.ts';
 
 // ==========================================
@@ -418,5 +419,54 @@ describe('InMemoryFinanceRepository - Balance Calculations', () => {
 
     balance = await financeRepo.getPlayerBalance(playerId);
     assert.equal(balance, -20);
+  });
+});
+
+describe('CreateMatchUseCase - Pitch Location & Google Maps', () => {
+  let matchRepo: InMemoryMatchRepository;
+  let createMatch: CreateMatchUseCase;
+
+  beforeEach(() => {
+    matchRepo = new InMemoryMatchRepository();
+    createMatch = new CreateMatchUseCase(matchRepo);
+  });
+
+  it('should create a match with address and explicit Google Maps link', async () => {
+    const match = await createMatch.execute({
+      location: 'Cancha El Campín 5',
+      locationAddress: 'Cra. 30 #57-60, Bogotá',
+      googleMapsUrl: 'https://maps.app.goo.gl/Vz5sFySMVhGJFrc3A?g_st=ic',
+      date: new Date('2026-09-15T19:00:00Z'),
+      pitchRentalCost: 120000,
+      extraCosts: 20000,
+      maxPlayers: 18,
+      openImmediately: true,
+    });
+
+    assert.equal(match.location, 'Cancha El Campín 5');
+    assert.equal(match.locationAddress, 'Cra. 30 #57-60, Bogotá');
+    assert.equal(match.googleMapsUrl, 'https://maps.app.goo.gl/Vz5sFySMVhGJFrc3A?g_st=ic');
+    assert.equal(match.maxPlayers, 18);
+    assert.equal(match.status, 'OPEN_REGISTRATION');
+
+    const saved = await matchRepo.findById(match.id);
+    assert.ok(saved);
+    assert.equal(saved.googleMapsUrl, 'https://maps.app.goo.gl/Vz5sFySMVhGJFrc3A?g_st=ic');
+  });
+
+  it('should automatically generate a Google Maps search URL when no custom link is provided', async () => {
+    const match = await createMatch.execute({
+      location: 'Cancha Los Sauces',
+      locationAddress: 'Calle 100 #15-20',
+      date: new Date('2026-09-20T20:00:00Z'),
+      pitchRentalCost: 100000,
+      extraCosts: 0,
+      maxPlayers: 18,
+    });
+
+    assert.ok(match.googleMapsUrl);
+    assert.ok(match.googleMapsUrl.startsWith('https://www.google.com/maps/search/?api=1&query='));
+    assert.ok(match.googleMapsUrl.includes('Cancha%20Los%20Sauces'));
+    assert.ok(match.googleMapsUrl.includes('Calle%20100'));
   });
 });
