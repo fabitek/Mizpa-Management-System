@@ -1226,7 +1226,7 @@ export function MatchSettlementCard({
             </Card>
           )}
 
-          {/* Attendances & Squad Table */}
+          {/* Attendances & Playing Squad Table (ONLY PLAYERS) */}
           <Card className="border-zinc-800 bg-zinc-900/60 shadow-md overflow-hidden">
             <CardHeader className="pb-3 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
@@ -1252,150 +1252,238 @@ export function MatchSettlementCard({
                   </Button>
                 )}
                 <span className="text-xs font-mono text-zinc-400 bg-zinc-800 px-2 py-1 rounded">
-                  {attendances.length} registros
+                  {attendances.filter((a) => a.guestType !== 'COMPANION').length} jugadores
                 </span>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {attendances.length === 0 ? (
+              {attendances.filter((a) => a.guestType !== 'COMPANION').length === 0 ? (
                 <div className="p-8 text-center text-zinc-500 text-sm">
-                  Aún no hay inscripciones para este partido. ¡Comparte el enlace de WhatsApp para abrir la convocatoria!
+                  Aún no hay jugadores inscritos para este partido. ¡Comparte el enlace de WhatsApp para abrir la convocatoria!
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow className="border-zinc-800 hover:bg-transparent">
                       <TableHead className="w-8">#</TableHead>
-                      <TableHead>Jugador / Invitado</TableHead>
-                      <TableHead>Rol / Tipo</TableHead>
+                      <TableHead>Jugador / Invitado Jugador</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Cuota Asignada</TableHead>
                       {!isSettled && <TableHead className="text-right">Acciones de Cancha</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {attendances.map((att, idx) => {
-                      const isCompanion = att.guestType === 'COMPANION';
-                      const isAttended = att.status === 'ATTENDED';
-                      const isWaitlist = att.status === 'WAITLIST';
-                      const isCancelled = att.status === 'CANCELLED';
+                    {attendances
+                      .filter((a) => a.guestType !== 'COMPANION')
+                      .map((att, idx) => {
+                        const isAttended = att.status === 'ATTENDED';
+                        const isWaitlist = att.status === 'WAITLIST';
+                        const isCancelled = att.status === 'CANCELLED';
 
-                      const badgeVariant = isAttended
-                        ? 'success'
-                        : isWaitlist
-                        ? 'warning'
-                        : isCancelled
-                        ? 'destructive'
-                        : 'default';
+                        const badgeVariant = isAttended
+                          ? 'success'
+                          : isWaitlist
+                          ? 'warning'
+                          : isCancelled
+                          ? 'destructive'
+                          : 'default';
 
-                      const isVehicleDriver = !!(att.hasVehicle || att.vehiclePlate);
-                      const pitchFee = isCompanion ? 0 : basePitchFee;
-                      const playerFee = pitchFee + (isVehicleDriver ? vehicleParkingFee : 0);
+                        const isVehicleDriver = !!(att.hasVehicle || att.vehiclePlate);
+                        const playerFee = basePitchFee + (isVehicleDriver ? vehicleParkingFee : 0);
 
-                      return (
-                        <TableRow key={att.id} className={isCancelled ? 'opacity-50' : isCompanion ? 'bg-blue-950/10' : ''}>
-                          <TableCell className="text-xs font-mono text-zinc-500 w-8">
-                            #{idx + 1}
-                          </TableCell>
-                          <TableCell className="align-middle">
-                            {renderAttendanceName(att)}
-                          </TableCell>
-                          <TableCell>
-                            {isCompanion ? (
-                              <Badge variant="info" className="text-[10px]">
-                                👥 Acompañante
-                              </Badge>
-                            ) : (
-                              <Badge variant="success" className="text-[10px]">
-                                ⚽ Jugador
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={badgeVariant} className="text-[10px]">
-                              {att.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {isCompanion ? (
-                              <div>
-                                <span className="font-semibold text-blue-300">
-                                  ${playerFee.toLocaleString('es-CO')} COP
-                                </span>
-                                <span className="text-[10px] text-zinc-400 block font-normal">
-                                  ($0 cancha {isVehicleDriver ? `+ 🚗 $${vehicleParkingFee.toLocaleString('es-CO')} parqueadero` : ''})
-                                </span>
-                              </div>
-                            ) : isAttended ? (
-                              <div>
-                                <span className="font-bold text-emerald-400">
-                                  ${playerFee.toLocaleString('es-CO')} COP
-                                </span>
-                                {isVehicleDriver && (
-                                  <span className="text-[10px] text-zinc-400 block font-normal">
-                                    (${basePitchFee.toLocaleString('es-CO')} cancha + 🚗 ${vehicleParkingFee.toLocaleString('es-CO')} parqueadero)
-                                  </span>
-                                )}
-                              </div>
-                            ) : isCancelled ? (
-                              <span className="text-zinc-500">$0</span>
-                            ) : (
-                              <div>
-                                <span className="text-zinc-400 font-medium">
-                                  ${playerFee.toLocaleString('es-CO')} COP
-                                </span>
-                                <span className="text-[10px] text-zinc-500 block">
-                                  (Pendiente check-in)
-                                </span>
-                              </div>
-                            )}
-                          </TableCell>
-                          {!isSettled && (
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                                {att.guestName && !isCancelled && (
-                                  <Button
-                                    onClick={() => handleToggleGuestType(att.id, att.guestType)}
-                                    disabled={isPending}
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-[10px] h-7 px-2 border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-                                    title="Cambiar entre Jugador (juega) y Acompañante (no juega)"
-                                  >
-                                    <RefreshCw className="w-3 h-3 mr-1 text-emerald-400" />
-                                    {isCompanion ? 'Hacer Jugador ⚽' : 'Hacer Acompañante 👥'}
-                                  </Button>
-                                )}
-                                {!isCancelled && !isWaitlist && (
-                                  <Button
-                                    onClick={() => handleCheckinToggle(att.id, att.status)}
-                                    disabled={isPending}
-                                    variant={isAttended ? 'secondary' : 'default'}
-                                    size="sm"
-                                    className="text-xs h-7 px-2"
-                                  >
-                                    <UserCheck className="w-3.5 h-3.5 mr-1" />
-                                    {isAttended ? 'Ausente' : 'Presente'}
-                                  </Button>
-                                )}
-                                {!isCancelled && (
-                                  <Button
-                                    onClick={() => handleCancelAttendance(att.id)}
-                                    disabled={isPending}
-                                    variant="destructive"
-                                    size="sm"
-                                    className="text-xs h-7 px-2"
-                                  >
-                                    <UserX className="w-3.5 h-3.5 mr-1" />
-                                    Cancelar
-                                  </Button>
-                                )}
-                              </div>
+                        return (
+                          <TableRow key={att.id} className={isCancelled ? 'opacity-50' : ''}>
+                            <TableCell className="text-xs font-mono text-zinc-500 w-8">
+                              #{idx + 1}
                             </TableCell>
-                          )}
-                        </TableRow>
-                      );
-                    })}
+                            <TableCell className="align-middle">
+                              {renderAttendanceName(att)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={badgeVariant} className="text-[10px]">
+                                {att.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {isAttended ? (
+                                <div>
+                                  <span className="font-bold text-emerald-400">
+                                    ${playerFee.toLocaleString('es-CO')} COP
+                                  </span>
+                                  {isVehicleDriver && (
+                                    <span className="text-[10px] text-zinc-400 block font-normal">
+                                      (${basePitchFee.toLocaleString('es-CO')} cancha + 🚗 ${vehicleParkingFee.toLocaleString('es-CO')} parqueadero)
+                                    </span>
+                                  )}
+                                </div>
+                              ) : isCancelled ? (
+                                <span className="text-zinc-500">$0</span>
+                              ) : (
+                                <div>
+                                  <span className="text-zinc-400 font-medium">
+                                    ${playerFee.toLocaleString('es-CO')} COP
+                                  </span>
+                                  <span className="text-[10px] text-zinc-500 block">
+                                    (Pendiente check-in)
+                                  </span>
+                                </div>
+                              )}
+                            </TableCell>
+                            {!isSettled && (
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                  {att.guestName && !isCancelled && (
+                                    <Button
+                                      onClick={() => handleToggleGuestType(att.id, att.guestType)}
+                                      disabled={isPending}
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-[10px] h-7 px-2 border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                                      title="Mover a lista de acompañantes (no juega fútbol)"
+                                    >
+                                      <RefreshCw className="w-3 h-3 mr-1 text-blue-400" />
+                                      Pasar a Acompañante 👥
+                                    </Button>
+                                  )}
+                                  {!isCancelled && !isWaitlist && (
+                                    <Button
+                                      onClick={() => handleCheckinToggle(att.id, att.status)}
+                                      disabled={isPending}
+                                      variant={isAttended ? 'secondary' : 'default'}
+                                      size="sm"
+                                      className="text-xs h-7 px-2"
+                                    >
+                                      <UserCheck className="w-3.5 h-3.5 mr-1" />
+                                      {isAttended ? 'Ausente' : 'Presente'}
+                                    </Button>
+                                  )}
+                                  {!isCancelled && (
+                                    <Button
+                                      onClick={() => handleCancelAttendance(att.id)}
+                                      disabled={isPending}
+                                      variant="destructive"
+                                      size="sm"
+                                      className="text-xs h-7 px-2"
+                                    >
+                                      <UserX className="w-3.5 h-3.5 mr-1" />
+                                      Cancelar
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        );
+                      })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Companions & Spectators Section (Separate Card for non-playing guests) */}
+          <Card className="border-blue-900/40 bg-gradient-to-b from-zinc-900 via-zinc-900 to-blue-950/20 shadow-md overflow-hidden">
+            <CardHeader className="pb-3 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <CardTitle className="text-base font-semibold flex items-center gap-2 text-blue-200">
+                  <Users className="w-4 h-4 text-blue-400" /> 👥 Acompañantes & Barra (No Juegan) ({companionCount})
+                </CardTitle>
+                <CardDescription className="text-xs text-zinc-400">
+                  Personas registradas como acompañantes / espectadores. No ocupan cupo en los {maxPlayers} de la nómina y su cuota de cancha es $0 COP.
+                </CardDescription>
+              </div>
+              <span className="text-xs font-mono text-blue-300 bg-blue-950/60 border border-blue-800/60 px-2 py-1 rounded">
+                Cuota Cancha: $0 COP
+              </span>
+            </CardHeader>
+            <CardContent className="p-0">
+              {attendances.filter((a) => a.guestType === 'COMPANION').length === 0 ? (
+                <div className="p-6 text-center text-zinc-500 text-xs">
+                  No hay acompañantes registrados para este partido.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-zinc-800 hover:bg-transparent">
+                      <TableHead className="w-8">#</TableHead>
+                      <TableHead>Nombre del Acompañante</TableHead>
+                      <TableHead>Acompaña a (Jugador)</TableHead>
+                      <TableHead>Vehículo / Placa</TableHead>
+                      <TableHead>Cuota Cancha</TableHead>
+                      {!isSettled && <TableHead className="text-right">Acciones</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {attendances
+                      .filter((a) => a.guestType === 'COMPANION')
+                      .map((att, idx) => {
+                        const hostPlayer = getPlayer(att.playerId);
+                        const isCancelled = att.status === 'CANCELLED';
+                        const isVehicleDriver = !!(att.hasVehicle || att.vehiclePlate);
+                        const companionFee = isVehicleDriver ? vehicleParkingFee : 0;
+
+                        return (
+                          <TableRow key={att.id} className={isCancelled ? 'opacity-50' : 'hover:bg-blue-950/10'}>
+                            <TableCell className="text-xs font-mono text-zinc-500 w-8">
+                              #{idx + 1}
+                            </TableCell>
+                            <TableCell className="font-semibold text-blue-300 text-sm">
+                              👥 {att.guestName || 'Acompañante'}
+                            </TableCell>
+                            <TableCell className="text-xs text-zinc-300">
+                              ⚽ {getPlayerDisplayName(hostPlayer, att.playerId)}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {att.vehiclePlate ? (
+                                <span className="font-mono text-emerald-400 font-bold bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
+                                  🚗 {att.vehiclePlate}
+                                </span>
+                              ) : (
+                                <span className="text-zinc-500 text-xs">Sin vehículo</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              <span className="text-zinc-300 font-medium">
+                                ${companionFee.toLocaleString('es-CO')} COP
+                              </span>
+                              <span className="text-[10px] text-zinc-500 block">
+                                ($0 cancha {isVehicleDriver ? `+ 🚗 $${vehicleParkingFee.toLocaleString('es-CO')} parqueadero` : ''})
+                              </span>
+                            </TableCell>
+                            {!isSettled && (
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {!isCancelled && (
+                                    <>
+                                      <Button
+                                        onClick={() => handleToggleGuestType(att.id, 'COMPANION')}
+                                        disabled={isPending}
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-xs h-7 px-2.5 border-emerald-700/60 text-emerald-300 hover:bg-emerald-950"
+                                        title="Pasar a jugador de nómina oficial en cancha"
+                                      >
+                                        <RefreshCw className="w-3 h-3 mr-1 text-emerald-400" />
+                                        Pasar a Jugador ⚽
+                                      </Button>
+                                      <Button
+                                        onClick={() => handleCancelAttendance(att.id)}
+                                        disabled={isPending}
+                                        variant="destructive"
+                                        size="sm"
+                                        className="text-xs h-7 px-2"
+                                      >
+                                        <UserX className="w-3.5 h-3.5 mr-1" />
+                                        Cancelar
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        );
+                      })}
                   </TableBody>
                 </Table>
               )}

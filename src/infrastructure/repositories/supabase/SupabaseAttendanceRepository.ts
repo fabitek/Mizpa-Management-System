@@ -36,6 +36,15 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
   }
 
   private mapRowToEntity(row: AttendanceRow): Attendance {
+    const rawGuestName = row.guest_name ?? undefined;
+    const isCompanion =
+      row.guest_type === 'COMPANION' ||
+      (rawGuestName ? rawGuestName.includes('(Acompañante)') || rawGuestName.includes('[COMPANION]') : false);
+
+    const cleanGuestName = rawGuestName
+      ? rawGuestName.replace(/\s*(\(Acompañante\)|\[COMPANION\])/gi, '').trim()
+      : undefined;
+
     return {
       id: row.id,
       matchId: row.match_id,
@@ -43,8 +52,8 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
       status: row.status as AttendanceStatus,
       registeredAt: new Date(row.registered_at),
       registeredByPlayerId: row.registered_by_player_id ?? undefined,
-      guestName: row.guest_name ?? undefined,
-      guestType: (row.guest_type as 'PLAYER' | 'COMPANION') || (row.guest_name ? 'PLAYER' : undefined),
+      guestName: cleanGuestName,
+      guestType: isCompanion ? 'COMPANION' : cleanGuestName ? 'PLAYER' : undefined,
       hasVehicle: row.has_vehicle ?? undefined,
       vehiclePlate: row.vehicle_plate ?? undefined,
     };
@@ -53,6 +62,17 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
   private mapEntityToRow(attendance: Attendance): Partial<AttendanceRow> {
     const validId = ensureUUID(attendance.id);
     attendance.id = validId;
+    const isCompanion = attendance.guestType === 'COMPANION';
+    const cleanGuestName = attendance.guestName
+      ? attendance.guestName.replace(/\s*(\(Acompañante\)|\[COMPANION\])/gi, '').trim()
+      : null;
+
+    const guestNameWithTag = cleanGuestName
+      ? isCompanion
+        ? `${cleanGuestName} (Acompañante)`
+        : cleanGuestName
+      : null;
+
     return {
       id: validId,
       match_id: ensureUUID(attendance.matchId),
@@ -60,8 +80,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
       status: attendance.status,
       registered_at: attendance.registeredAt.toISOString(),
       registered_by_player_id: optionalUUID(attendance.registeredByPlayerId),
-      guest_name: attendance.guestName ?? null,
-      guest_type: attendance.guestType ?? (attendance.guestName ? 'PLAYER' : null),
+      guest_name: guestNameWithTag,
       has_vehicle: attendance.hasVehicle ?? null,
       vehicle_plate: attendance.vehiclePlate ?? null,
     };

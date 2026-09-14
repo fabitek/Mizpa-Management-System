@@ -275,32 +275,57 @@ export function PublicRsvpView({
           });
         }
 
-        const guestToRegister = hasGuest ? guestName.trim() : undefined;
         const plateToRegister = hasVehicle ? vehiclePlate.trim().toUpperCase() : undefined;
 
-        const res = await registerAttendanceAction(
+        // 1. Register the host player himself
+        const resPlayer = await registerAttendanceAction(
           match.id,
           playerIdToUse,
-          guestToRegister,
+          undefined,
           hasVehicle,
           plateToRegister,
-          hasGuest ? guestType : undefined
+          undefined
         );
 
-        setFeedback(res);
-        if (res.success && res.data) {
-          const newAtt = (res.data as any).attendance;
-          if (registerMode === 'new' && !newAtt.guestName) {
-            newAtt.guestName = displayName;
-          }
-
-          setAttendances((prev) => {
-            const exists = prev.some((a) => a.id === newAtt.id);
-            return exists ? prev : [...prev, newAtt];
-          });
-
-          setStep('completed');
+        if (!resPlayer.success) {
+          setFeedback(resPlayer);
+          return;
         }
+
+        const newAttendancesToAdd: Attendance[] = [];
+        if (resPlayer.data) {
+          const playerAtt = (resPlayer.data as any).attendance;
+          newAttendancesToAdd.push(playerAtt);
+        }
+
+        // 2. If user also specified a guest, register the guest record
+        if (hasGuest && guestName.trim()) {
+          const resGuest = await registerAttendanceAction(
+            match.id,
+            playerIdToUse,
+            guestName.trim(),
+            false,
+            undefined,
+            guestType
+          );
+          if (resGuest.success && resGuest.data) {
+            const guestAtt = (resGuest.data as any).attendance;
+            newAttendancesToAdd.push(guestAtt);
+          }
+        }
+
+        setFeedback(resPlayer);
+        setAttendances((prev) => {
+          let updated = [...prev];
+          for (const newAtt of newAttendancesToAdd) {
+            if (!updated.some((a) => a.id === newAtt.id)) {
+              updated.push(newAtt);
+            }
+          }
+          return updated;
+        });
+
+        setStep('completed');
       } catch (err) {
         setFeedback({ success: false, message: 'Error al conectar con el servidor.' });
       }
