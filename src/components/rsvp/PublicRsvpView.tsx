@@ -86,6 +86,7 @@ export function PublicRsvpView({
   // Google / Gmail Verification State
   const [gmailAddress, setGmailAddress] = useState<string>('');
   const [isGmailVerified, setIsGmailVerified] = useState<boolean>(false);
+  const [recognizedPlayer, setRecognizedPlayer] = useState<Player | null>(null);
 
   const [feedback, setFeedback] = useState<{ success: boolean; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -168,7 +169,7 @@ export function PublicRsvpView({
     setFeedback({ success: true, message: 'Enlace del formulario copiado al portapapeles.' });
   };
 
-  // Step 1: Validate Google Email
+  // Step 1: Validate Google Email & Intelligent Auto-recognition
   const handleStep1Submit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const cleanEmail = gmailAddress.trim().toLowerCase();
@@ -181,7 +182,47 @@ export function PublicRsvpView({
     setIsGmailVerified(true);
     setFeedback(null);
 
-    // Auto-derive suggested name if empty
+    // Look for existing player with matching email
+    const matchedPlayer = players.find(
+      (p) => p.email && p.email.trim().toLowerCase() === cleanEmail
+    );
+
+    if (matchedPlayer) {
+      // Check if already registered in this match
+      if (registeredPlayerIds.has(matchedPlayer.id)) {
+        const att = attendances.find((a) => a.playerId === matchedPlayer.id);
+        const statusText =
+          att?.status === 'CONFIRMED' || att?.status === 'ATTENDED'
+            ? 'CONFIRMADO en nómina'
+            : 'en LISTA DE ESPERA';
+        setFeedback({
+          success: true,
+          message: `¡Hola, ${matchedPlayer.fullName}! Ya estás inscrito en este partido como ${statusText}.`,
+        });
+        setRecognizedPlayer(matchedPlayer);
+        setSelectedPlayerId(matchedPlayer.id);
+        setNewPlayerName(matchedPlayer.fullName);
+        setNewPlayerDocumentId(matchedPlayer.documentId || '');
+        setNewPlayerPhone(matchedPlayer.phone || '');
+        return;
+      }
+
+      // Autocomplete details
+      setRecognizedPlayer(matchedPlayer);
+      setSelectedPlayerId(matchedPlayer.id);
+      setNewPlayerName(matchedPlayer.fullName);
+      setNewPlayerDocumentId(matchedPlayer.documentId || '');
+      setNewPlayerPhone(matchedPlayer.phone || '');
+      setFeedback({
+        success: true,
+        message: `⚡ ¡Hola, ${matchedPlayer.fullName}! Reconocimos tu cuenta de Google. Datos precargados automáticamente.`,
+      });
+      // Skip directly to Step 4 (Logistics / Vehicle & Guest)
+      setStep(4);
+      return;
+    }
+
+    // Auto-derive suggested name if empty and player not registered
     if (!newPlayerName.trim()) {
       const namePart = cleanEmail.split('@')[0].replace(/[._-]/g, ' ');
       const capitalized = namePart
@@ -191,6 +232,7 @@ export function PublicRsvpView({
       setNewPlayerName(capitalized);
     }
 
+    setRecognizedPlayer(null);
     setStep(2);
   };
 
@@ -205,10 +247,33 @@ export function PublicRsvpView({
     setStep(3);
   };
 
+  // Handle Document Input Change with Live Auto-recognition
+  const handleDocumentChange = (docVal: string) => {
+    setNewPlayerDocumentId(docVal);
+    const cleanDoc = docVal.trim();
+    if (cleanDoc.length >= 5) {
+      const matched = players.find(
+        (p) => p.documentId && p.documentId.trim() === cleanDoc
+      );
+      if (matched && (!recognizedPlayer || recognizedPlayer.id !== matched.id)) {
+        setRecognizedPlayer(matched);
+        setSelectedPlayerId(matched.id);
+        if (matched.fullName) setNewPlayerName(matched.fullName);
+        if (matched.phone) setNewPlayerPhone(matched.phone);
+        if (matched.email && !gmailAddress) setGmailAddress(matched.email);
+        setFeedback({
+          success: true,
+          message: `⚡ Cédula identificada: ¡Hola, ${matched.fullName}! Tus datos fueron vinculados automáticamente.`,
+        });
+      }
+    }
+  };
+
   // Step 3: Validate Document & Phone
   const handleStep3Submit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!newPlayerDocumentId.trim()) {
+    const cleanDoc = newPlayerDocumentId.trim();
+    if (!cleanDoc) {
       setFeedback({ success: false, message: 'Por favor ingresa tu Cédula / Documento de Identidad.' });
       return;
     }
@@ -216,6 +281,21 @@ export function PublicRsvpView({
       setFeedback({ success: false, message: 'Por favor ingresa tu número de WhatsApp.' });
       return;
     }
+
+    // Check if doc matches a player
+    const matched = players.find((p) => p.documentId && p.documentId.trim() === cleanDoc);
+    if (matched) {
+      if (registeredPlayerIds.has(matched.id)) {
+        setFeedback({
+          success: false,
+          message: `¡Hola ${matched.fullName}! Esta cédula ya se encuentra registrada en este partido.`,
+        });
+        return;
+      }
+      setRecognizedPlayer(matched);
+      setSelectedPlayerId(matched.id);
+    }
+
     setFeedback(null);
     setStep(4);
   };
@@ -736,6 +816,52 @@ export function PublicRsvpView({
                       onChange={(e) => setGmailAddress(e.target.value)}
                       className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-emerald-500 rounded-2xl px-4 py-3.5 text-base sm:text-lg text-zinc-100 placeholder-zinc-500 focus:outline-none transition-all shadow-inner"
                     />
+
+                    {/* Live smart match suggestion hint when typing */}
+                    {gmailAddress.trim().length >= 3 && !isGmailVerified && (() => {
+                      const cleanSearch = gmailAddress.trim().toLowerCase();
+                      const suggestions = players
+                        .filter(
+                          (p) =>
+                            (p.email && p.email.toLowerCase().includes(cleanSearch)) ||
+                            p.fullName.toLowerCase().includes(cleanSearch)
+                        )
+                        .slice(0, 3);
+                      if (suggestions.length === 0) return null;
+                      return (
+                        <div className="mt-2 bg-zinc-900/90 border border-emerald-500/30 rounded-xl p-2.5 space-y-1.5 shadow-xl animate-in fade-in">
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-semibold px-1">
+                            ⚡ ¿Eres alguno de estos jugadores registrados?
+                          </span>
+                          <div className="space-y-1">
+                            {suggestions.map((sp) => (
+                              <button
+                                key={sp.id}
+                                type="button"
+                                onClick={() => {
+                                  if (sp.email) setGmailAddress(sp.email);
+                                  setRecognizedPlayer(sp);
+                                  setSelectedPlayerId(sp.id);
+                                  setNewPlayerName(sp.fullName);
+                                  setNewPlayerDocumentId(sp.documentId || '');
+                                  setNewPlayerPhone(sp.phone || '');
+                                  setIsGmailVerified(true);
+                                  setFeedback({
+                                    success: true,
+                                    message: `⚡ ¡Hola, ${sp.fullName}! Datos precargados automáticamente.`,
+                                  });
+                                  setStep(4);
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-emerald-950/60 hover:border-emerald-500/40 border border-transparent transition-all flex items-center justify-between text-xs text-zinc-200"
+                              >
+                                <span className="font-semibold text-emerald-300">⚽ {sp.fullName}</span>
+                                <span className="text-[10px] text-zinc-400 font-mono">{sp.email || (sp.documentId ? `CC: ${sp.documentId}` : '')}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex items-center gap-3">
@@ -845,7 +971,7 @@ export function PublicRsvpView({
                       autoFocus
                       placeholder="Ej: 1020304050"
                       value={newPlayerDocumentId}
-                      onChange={(e) => setNewPlayerDocumentId(e.target.value)}
+                      onChange={(e) => handleDocumentChange(e.target.value)}
                       className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-emerald-500 rounded-2xl px-4 py-3 text-base text-zinc-100 font-mono placeholder-zinc-500 focus:outline-none transition-all"
                     />
                   </div>
@@ -900,6 +1026,38 @@ export function PublicRsvpView({
                     Configura tu acceso vehicular y cupos adicionales si aplica.
                   </p>
                 </div>
+
+                {/* Auto-recognized Player Banner */}
+                {recognizedPlayer && (
+                  <div className="bg-emerald-950/60 border border-emerald-500/40 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-inner">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center text-emerald-400 font-bold shrink-0">
+                        ⚡
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-bold text-white truncate">{recognizedPlayer.fullName}</span>
+                          <Badge variant="success" className="text-[9px] uppercase font-mono px-1.5 py-0">
+                            Jugador Habitual
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-zinc-400 truncate">
+                          CC: <span className="font-mono text-zinc-300">{newPlayerDocumentId || recognizedPlayer.documentId}</span> • Tel: <span className="font-mono text-zinc-300">{newPlayerPhone || recognizedPlayer.phone}</span>
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRecognizedPlayer(null);
+                        setStep(2);
+                      }}
+                      className="text-xs text-emerald-400 hover:text-emerald-300 underline font-medium shrink-0"
+                    >
+                      Editar datos
+                    </button>
+                  </div>
+                )}
 
                 <form onSubmit={handleStep4Submit} className="space-y-4">
                   {/* Vehicle Card */}
@@ -1018,7 +1176,13 @@ export function PublicRsvpView({
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setStep(3)}
+                      onClick={() => {
+                        if (recognizedPlayer) {
+                          setStep(1);
+                        } else {
+                          setStep(3);
+                        }
+                      }}
                       className="border-zinc-700 text-zinc-400 hover:text-zinc-200 rounded-xl"
                     >
                       <ArrowLeft className="w-4 h-4" />
