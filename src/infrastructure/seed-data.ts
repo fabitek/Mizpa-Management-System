@@ -13,10 +13,34 @@ export const initialPlayers: Player[] = [
   },
 ];
 
-export const initialMatches: Match[] = [];
-export const initialMatch: Match | null = null;
+export const initialMatch: Match = {
+  id: 'm1000000-0000-4000-8000-000000000001',
+  date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+  location: 'Cancha Sintética El Campín (Bogotá)',
+  locationAddress: 'Calle 53 # 30-15',
+  googleMapsUrl: 'https://maps.google.com',
+  pitchRentalCost: 180000,
+  extraCosts: 20000,
+  durationHours: 2,
+  parkingFeePerHour: 1000,
+  maxPlayers: 18,
+  settledFeePerPlayer: null,
+  status: 'OPEN_REGISTRATION',
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
-export const initialAttendances: Attendance[] = [];
+export const initialMatches: Match[] = [initialMatch];
+
+export const initialAttendances: Attendance[] = [
+  {
+    id: 'att-00000000-0000-4000-8000-000000000001',
+    matchId: initialMatch.id,
+    playerId: 'f0000000-0000-4000-8000-000000000001',
+    status: 'CONFIRMED',
+    registeredAt: new Date(),
+  },
+];
 
 export const initialGoals: GoalEvent[] = [];
 

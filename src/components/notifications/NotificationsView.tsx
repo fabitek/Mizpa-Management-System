@@ -33,6 +33,7 @@ import {
   Sparkles,
   Edit2,
   Trash2,
+  PlusCircle,
 } from 'lucide-react';
 
 interface NotificationsViewProps {
@@ -509,7 +510,20 @@ export function NotificationsView({
                   className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 text-xs sm:text-sm font-mono text-zinc-200 whitespace-pre-wrap leading-relaxed shadow-inner"
                   suppressHydrationWarning
                 >
-                  {currentMatch ? groupConvocationText : '⚠️ No hay ningún partido activo en este momento. Crea un nuevo partido en la pestaña "Partidos" para generar la plantilla oficial de WhatsApp.'}
+                  {currentMatch ? (
+                    groupConvocationText
+                  ) : (
+                    <div className="space-y-3 py-2 text-center sm:text-left">
+                      <p className="text-amber-300">
+                        ⚠️ No hay ningún partido activo en este momento en la base de datos.
+                      </p>
+                      <Link href="/matches">
+                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold gap-1.5 text-xs">
+                          <PlusCircle className="w-4 h-4" /> Ir a Crear Partido en la pestaña &quot;Partidos&quot;
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
 
