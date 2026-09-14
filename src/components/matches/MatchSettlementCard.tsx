@@ -22,6 +22,11 @@ import {
 } from '../../app/actions/rsvp-actions.ts';
 import type { Match, Attendance, Player, MatchStatus } from '../../core/domain/index.ts';
 import {
+  formatColombianPlate,
+  formatPlateBadge,
+  getVehicleIcon,
+} from '../../core/utils/plate-formatter.ts';
+import {
   Calendar,
   MapPin,
   Users,
@@ -379,7 +384,8 @@ export function MatchSettlementCard({
       const name = a.guestName
         ? `${a.guestName} (${isComp ? 'Acompañante' : 'Invitado'} de ${host?.fullName || 'Anfitrión'})`
         : host?.fullName || a.playerId;
-      return `${i + 1}. 🚗 Placa: ${a.vehiclePlate || 'Registrado'} — ${name}`;
+      const formattedBadge = a.vehiclePlate ? formatPlateBadge(a.vehiclePlate) : '🚗 Registrado';
+      return `${i + 1}. ${formattedBadge} — ${name}`;
     });
     const text = `🚗 *PLANILLA DE VEHÍCULOS / PARQUEADERO - MIZPA FC*\n📍 *Sede:* ${match.location}\n📅 *Fecha:* ${formattedDate}\n\n${lines.join('\n')}\n\nTotal autorizados: ${vehicleList.length} vehículos.`;
     navigator.clipboard.writeText(text);
@@ -419,7 +425,7 @@ export function MatchSettlementCard({
         {att.vehiclePlate && (
           <div>
             <span className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-300 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700">
-              🚗 Placa: <strong className="text-emerald-400 font-bold">{att.vehiclePlate}</strong>
+              <strong className="text-emerald-400 font-bold">{formatPlateBadge(att.vehiclePlate)}</strong>
             </span>
           </div>
         )}
@@ -1436,7 +1442,7 @@ export function MatchSettlementCard({
                             <TableCell className="text-xs">
                               {att.vehiclePlate ? (
                                 <span className="font-mono text-emerald-400 font-bold bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
-                                  🚗 {att.vehiclePlate}
+                                  {formatPlateBadge(att.vehiclePlate)}
                                 </span>
                               ) : (
                                 <span className="text-zinc-500 text-xs">Sin vehículo</span>

@@ -8,7 +8,14 @@ import {
   registerAttendanceAction,
   createPlayerAction,
 } from '../../app/actions/rsvp-actions.ts';
-import type { Match, Attendance, Player } from '../../core/domain/types.ts';
+import { recordPlayerCreditAction } from '../../app/actions/finance-actions.ts';
+import { ReceiptUploader } from '../wallet/ReceiptUploader.tsx';
+import {
+  formatColombianPlate,
+  formatPlateBadge,
+  getVehicleIcon,
+} from '../../core/utils/plate-formatter.ts';
+import type { Match, Attendance, Player, ReceiptOcrResult } from '../../core/domain/types.ts';
 import {
   Calendar,
   MapPin,
@@ -18,6 +25,7 @@ import {
   AlertCircle,
   Share2,
   Copy,
+  Check,
   UserPlus,
   Clock,
   UserCheck,
@@ -31,6 +39,9 @@ import {
   ChevronDown,
   Info,
   Sparkles,
+  Smartphone,
+  QrCode,
+  Zap,
 } from 'lucide-react';
 
 interface PublicRsvpViewProps {
@@ -87,6 +98,16 @@ export function PublicRsvpView({
   const [gmailAddress, setGmailAddress] = useState<string>('');
   const [isGmailVerified, setIsGmailVerified] = useState<boolean>(false);
   const [recognizedPlayer, setRecognizedPlayer] = useState<Player | null>(null);
+
+  // Self-Service Payment & Completion States
+  const [completedPlayerId, setCompletedPlayerId] = useState<string>('');
+  const [paymentReceiptUrl, setPaymentReceiptUrl] = useState<string>('');
+  const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [paymentNote, setPaymentNote] = useState<string>('');
+  const [paymentFeedback, setPaymentFeedback] = useState<{ success: boolean; message: string } | null>(null);
+  const [isPaymentPending, startPaymentTransition] = useTransition();
+  const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false);
+  const [copiedBankId, setCopiedBankId] = useState<string | null>(null);
 
   const [feedback, setFeedback] = useState<{ success: boolean; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -405,9 +426,95 @@ export function PublicRsvpView({
           return updated;
         });
 
+        setCompletedPlayerId(playerIdToUse);
+        setPaymentAmount(totalEstimatedForUser);
+        setPaymentNote(`Cuota partido - ${match.location}`);
         setStep('completed');
       } catch (err) {
         setFeedback({ success: false, message: 'Error al conectar con el servidor.' });
+      }
+    });
+  };
+
+  const RSVP_BANK_CHANNELS = [
+    {
+      id: 'nequi',
+      name: 'Nequi',
+      number: '313 410 7123',
+      rawNumber: '3134107123',
+      owner: 'Fabián Téllez (Mizpa FC)',
+      badge: '🟣 Nequi',
+      color: 'border-fuchsia-500/40 bg-fuchsia-950/20 text-fuchsia-300',
+    },
+    {
+      id: 'daviplata',
+      name: 'Daviplata',
+      number: '313 410 7123',
+      rawNumber: '3134107123',
+      owner: 'Fabián Téllez',
+      badge: '🔴 Daviplata',
+      color: 'border-red-500/40 bg-red-950/20 text-red-300',
+    },
+    {
+      id: 'bancolombia',
+      name: 'Bancolombia Ahorros',
+      number: '044-000000-00',
+      rawNumber: '04400000000',
+      owner: 'Mizpa FC / Fabián Téllez',
+      badge: '🟡 Bancolombia',
+      color: 'border-yellow-500/40 bg-yellow-950/20 text-yellow-300',
+    },
+  ];
+
+  const handleCopyBank = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedBankId(id);
+    setTimeout(() => setCopiedBankId(null), 2500);
+  };
+
+  const handleSelfServiceReceiptLoaded = (data: {
+    receiptUrl: string;
+    ocrResult?: ReceiptOcrResult;
+    suggestedAmount?: number;
+    suggestedNote?: string;
+  }) => {
+    setPaymentReceiptUrl(data.receiptUrl);
+    if (data.suggestedAmount && data.suggestedAmount > 0) {
+      setPaymentAmount(data.suggestedAmount);
+    }
+    if (data.suggestedNote) {
+      setPaymentNote(data.suggestedNote);
+    }
+  };
+
+  const handleSelfServicePaymentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const pid = completedPlayerId || selectedPlayerId;
+    if (!pid) {
+      setPaymentFeedback({ success: false, message: 'No se encontró el identificador del jugador.' });
+      return;
+    }
+    if (paymentAmount <= 0) {
+      setPaymentFeedback({ success: false, message: 'El monto a transferir debe ser mayor a $0.' });
+      return;
+    }
+
+    startPaymentTransition(async () => {
+      try {
+        const res = await recordPlayerCreditAction(
+          pid,
+          paymentAmount,
+          paymentNote.trim() || `Abono partido - ${match.location}`,
+          paymentReceiptUrl || undefined
+        );
+        if (res.success) {
+          setPaymentSuccess(true);
+          setPaymentFeedback(res);
+        } else {
+          setPaymentFeedback(res);
+        }
+      } catch (err) {
+        setPaymentFeedback({ success: false, message: 'Error al registrar el comprobante en tesorería.' });
       }
     });
   };
@@ -453,7 +560,9 @@ export function PublicRsvpView({
             {hasVehicle && (
               <div className="flex justify-between items-center text-zinc-300 border-b border-zinc-800 pb-2">
                 <span className="text-zinc-400">Vehículo Registrado:</span>
-                <span className="text-emerald-400 font-mono font-bold">{vehiclePlate}</span>
+                <span className="text-emerald-400 font-mono font-bold">
+                  {formatPlateBadge(vehiclePlate)}
+                </span>
               </div>
             )}
             {hasGuest && (
@@ -488,6 +597,151 @@ export function PublicRsvpView({
           </div>
         </div>
 
+        {/* SELF-SERVICE PLAYER PAYMENT & RECEIPT UPLOAD CARD */}
+        <div className="bg-gradient-to-b from-zinc-900 to-zinc-950 border border-emerald-500/30 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-base">💳</span>
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                  Pagar mi Cuota por Transferencia
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full uppercase font-mono">
+                    Autogestión
+                  </span>
+                </h2>
+                <p className="text-xs text-zinc-400">
+                  Transfiere y sube tu comprobante para acreditar tu pago de inmediato.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {paymentSuccess ? (
+            <div className="bg-emerald-950/50 border border-emerald-500/50 rounded-2xl p-5 text-center space-y-3 animate-in zoom-in-95">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 text-2xl flex items-center justify-center mx-auto">
+                ✓
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">¡Comprobante Registrado en Tesorería!</h3>
+                <p className="text-xs text-emerald-300 mt-1">
+                  Tu abono de <strong className="font-mono text-white">${paymentAmount.toLocaleString('es-CO')} COP</strong> fue registrado exitosamente.
+                </p>
+              </div>
+              <p className="text-[11px] text-zinc-400">
+                El administrador ya tiene tu comprobante guardado en el balance del partido.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Bank quick copy buttons */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
+                  1. Cuentas oficiales de Mizpa FC (Toca para copiar):
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {RSVP_BANK_CHANNELS.map((ch) => {
+                    const isCopied = copiedBankId === ch.id;
+                    return (
+                      <div
+                        key={ch.id}
+                        onClick={() => handleCopyBank(ch.rawNumber, ch.id)}
+                        className={`border rounded-xl p-2.5 cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between ${ch.color}`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-bold">{ch.badge}</span>
+                          {isCopied ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5 opacity-60" />
+                          )}
+                        </div>
+                        <div className="font-mono font-bold text-xs text-white">
+                          {ch.number}
+                        </div>
+                        <span className="text-[9px] text-zinc-400 truncate mt-0.5">
+                          {isCopied ? '¡Copiado!' : ch.owner}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Receipt uploader with OCR */}
+              <div className="space-y-2 pt-2 border-t border-zinc-800/80">
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
+                  2. Sube o pega la captura de tu transferencia (Lectura Automática OCR):
+                </span>
+                <ReceiptUploader
+                  onReceiptLoaded={handleSelfServiceReceiptLoaded}
+                  currentReceiptUrl={paymentReceiptUrl}
+                  onClearReceipt={() => setPaymentReceiptUrl('')}
+                />
+              </div>
+
+              {/* Amount and confirm */}
+              <form onSubmit={handleSelfServicePaymentSubmit} className="space-y-3 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] text-zinc-400 block mb-1">Monto transferido ($ COP):</label>
+                    <input
+                      type="number"
+                      required
+                      min={1000}
+                      step={1000}
+                      value={paymentAmount || totalEstimatedForUser}
+                      onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-zinc-400 block mb-1">Detalle / Nota:</label>
+                    <input
+                      type="text"
+                      value={paymentNote}
+                      onChange={(e) => setPaymentNote(e.target.value)}
+                      placeholder="Ej: Cuota partido viernes"
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                {paymentFeedback && (
+                  <div
+                    className={`p-3 rounded-xl text-xs flex items-center gap-2 border ${
+                      paymentFeedback.success
+                        ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-200'
+                        : 'bg-red-950/60 border-red-500/40 text-red-200'
+                    }`}
+                  >
+                    {paymentFeedback.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                    )}
+                    <span>{paymentFeedback.message}</span>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  disabled={isPaymentPending}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl shadow-md text-xs gap-2"
+                >
+                  {isPaymentPending ? (
+                    'Registrando comprobante...'
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      Acreditar Mi Pago de ${(paymentAmount || totalEstimatedForUser).toLocaleString('es-CO')} COP
+                    </>
+                  )}
+                </Button>
+              </form>
+            </div>
+          )}
+        </div>
+
         {/* Live Confirmed Squad Roster */}
         <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-5 shadow-lg space-y-4">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
@@ -516,8 +770,8 @@ export function PublicRsvpView({
                         <span className="font-medium text-zinc-100">⚽ {host?.fullName || att.playerId}</span>
                       )}
                       {att.vehiclePlate && (
-                        <span className="ml-2 font-mono text-[11px] text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700/60">
-                          🚗 {att.vehiclePlate}
+                        <span className="ml-2 font-mono text-[11px] text-zinc-300 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700/60">
+                          {formatPlateBadge(att.vehiclePlate)}
                         </span>
                       )}
                     </div>
@@ -546,8 +800,8 @@ export function PublicRsvpView({
                         <span className="text-blue-400 font-semibold">👥 {att.guestName || 'Acompañante'}</span>
                         <span className="text-[11px] text-zinc-500">(con {host?.fullName || 'Jugador'})</span>
                         {att.vehiclePlate && (
-                          <span className="font-mono text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded">
-                            🚗 {att.vehiclePlate}
+                          <span className="font-mono text-[10px] text-zinc-300 bg-zinc-800 px-1.5 py-0.5 rounded">
+                            {formatPlateBadge(att.vehiclePlate)}
                           </span>
                         )}
                       </div>
@@ -677,13 +931,20 @@ export function PublicRsvpView({
               </label>
 
               {hasVehicle && (
-                <input
-                  type="text"
-                  placeholder="Placa del vehículo (Ej: ABC-123)"
-                  value={vehiclePlate}
-                  onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())}
-                  className="w-full bg-zinc-900 border border-zinc-700 focus:border-emerald-500 rounded-xl px-4 py-2.5 text-sm text-zinc-100 uppercase tracking-widest font-mono font-bold"
-                />
+                <div className="space-y-1">
+                  <input
+                    type="text"
+                    placeholder="Placa del vehículo (Ej: ABC-123 o ABC-12D)"
+                    value={vehiclePlate}
+                    onChange={(e) => setVehiclePlate(formatColombianPlate(e.target.value))}
+                    className="w-full bg-zinc-900 border border-zinc-700 focus:border-emerald-500 rounded-xl px-4 py-2.5 text-sm text-zinc-100 uppercase tracking-widest font-mono font-bold"
+                  />
+                  {vehiclePlate && (
+                    <span className="text-[11px] font-mono text-emerald-400 font-semibold block px-1">
+                      {formatPlateBadge(vehiclePlate)}
+                    </span>
+                  )}
+                </div>
               )}
 
               {/* Guest option */}
@@ -1083,18 +1344,23 @@ export function PublicRsvpView({
                     </label>
 
                     {hasVehicle && (
-                      <div className="pt-2 border-t border-zinc-800">
-                        <label className="text-xs text-emerald-300 block mb-1 font-medium">
+                      <div className="pt-2 border-t border-zinc-800 space-y-1">
+                        <label className="text-xs text-emerald-300 block font-medium">
                           Placa del Vehículo (control de portería):
                         </label>
                         <input
                           type="text"
                           required
-                          placeholder="Ej: ABC-123"
+                          placeholder="Ej: ABC-123 o ABC-12D"
                           value={vehiclePlate}
-                          onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())}
+                          onChange={(e) => setVehiclePlate(formatColombianPlate(e.target.value))}
                           className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3.5 py-2 text-sm text-zinc-100 uppercase tracking-widest font-mono font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
+                        {vehiclePlate && (
+                          <span className="text-[11px] font-mono text-emerald-400 font-semibold block px-1">
+                            {formatPlateBadge(vehiclePlate)}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1233,7 +1499,9 @@ export function PublicRsvpView({
                   {hasVehicle && (
                     <div className="flex justify-between items-center text-zinc-300 border-b border-zinc-800 pb-2">
                       <span className="text-zinc-400">Vehículo:</span>
-                      <span className="text-emerald-400 font-mono font-bold">{vehiclePlate}</span>
+                      <span className="text-emerald-400 font-mono font-bold">
+                        {formatPlateBadge(vehiclePlate)}
+                      </span>
                     </div>
                   )}
                   {hasGuest && (
