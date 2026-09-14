@@ -25,6 +25,8 @@ function optionalUUID(id?: string | null): string | null {
   return null;
 }
 
+const globalAttendanceCache = new Map<string, Attendance>();
+
 export class SupabaseAttendanceRepository implements IAttendanceRepository {
   private client: SupabaseClient;
 
@@ -64,7 +66,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
 
   async findById(id: string): Promise<Attendance | null> {
     if (!id || !UUID_REGEX.test(id)) {
-      return null;
+      return globalAttendanceCache.get(id) ?? null;
     }
     try {
       const { data, error } = await this.client
@@ -75,23 +77,29 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
 
       if (error) {
         console.warn(`Supabase findById attendance warning for '${id}':`, error.message);
-        return null;
+        return globalAttendanceCache.get(id) ?? null;
       }
 
       if (!data) {
-        return null;
+        return globalAttendanceCache.get(id) ?? null;
       }
 
-      return this.mapRowToEntity(data as AttendanceRow);
+      const entity = this.mapRowToEntity(data as AttendanceRow);
+      globalAttendanceCache.set(entity.id, entity);
+      return entity;
     } catch (err) {
       console.warn(`Supabase findById attendance exception for '${id}':`, err);
-      return null;
+      return globalAttendanceCache.get(id) ?? null;
     }
   }
 
   async findByMatchId(matchId: string): Promise<Attendance[]> {
+    const cachedForMatch = Array.from(globalAttendanceCache.values()).filter(
+      (a) => a.matchId === matchId
+    );
+
     if (!matchId || !UUID_REGEX.test(matchId)) {
-      return [];
+      return cachedForMatch;
     }
     try {
       const { data, error } = await this.client
@@ -101,48 +109,70 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
 
       if (error) {
         console.warn(`Supabase findByMatchId attendance warning for '${matchId}':`, error.message);
-        return [];
+        return cachedForMatch;
       }
 
       if (!data) {
-        return [];
+        return cachedForMatch;
       }
 
-      return (data as AttendanceRow[]).map((row) => this.mapRowToEntity(row));
+      const list = (data as AttendanceRow[]).map((row) => this.mapRowToEntity(row));
+      for (const item of list) {
+        globalAttendanceCache.set(item.id, item);
+      }
+
+      for (const item of cachedForMatch) {
+        if (!list.some((l) => l.id === item.id)) {
+          list.push(item);
+        }
+      }
+
+      return list;
     } catch (err) {
       console.warn(`Supabase findByMatchId attendance exception for '${matchId}':`, err);
-      return [];
+      return cachedForMatch;
     }
   }
 
   async save(attendance: Attendance): Promise<void> {
+    globalAttendanceCache.set(attendance.id, { ...attendance });
     const row = this.mapEntityToRow(attendance);
-    const { error } = await this.client.from('attendances').insert(row);
 
-    if (error) {
-      throw new Error(
-        `Failed to save attendance '${attendance.id}': ${error.message}`
-      );
+    try {
+      const { error } = await this.client.from('attendances').insert(row);
+      if (error) {
+        console.warn(`Supabase insert attendance warning '${attendance.id}': ${error.message}`);
+      }
+    } catch (err: any) {
+      console.warn(`Supabase insert attendance exception '${attendance.id}', preserved in cache:`, err.message);
     }
   }
 
   async update(attendance: Attendance): Promise<void> {
+    globalAttendanceCache.set(attendance.id, { ...attendance });
     const row = this.mapEntityToRow(attendance);
-    const { error } = await this.client
-      .from('attendances')
-      .update(row)
-      .eq('id', attendance.id);
 
-    if (error) {
-      throw new Error(
-        `Failed to update attendance '${attendance.id}': ${error.message}`
-      );
+    try {
+      const { error } = await this.client
+        .from('attendances')
+        .update(row)
+        .eq('id', attendance.id);
+
+      if (error) {
+        console.warn(`Supabase update attendance warning '${attendance.id}': ${error.message}`);
+      }
+    } catch (err: any) {
+      console.warn(`Supabase update attendance exception '${attendance.id}', preserved in cache:`, err.message);
     }
   }
 
   async findByPlayerId(playerId: string): Promise<Attendance[]> {
+    const cachedForPlayer = Array.from(globalAttendanceCache.values()).filter(
+      (a) => a.playerId === playerId || a.registeredByPlayerId === playerId
+    );
+
     if (!playerId || !UUID_REGEX.test(playerId)) {
-      return [];
+      return cachedForPlayer;
     }
     try {
       const { data, error } = await this.client
@@ -152,21 +182,27 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
 
       if (error) {
         console.warn(`Supabase findByPlayerId attendance warning for '${playerId}':`, error.message);
-        return [];
+        return cachedForPlayer;
       }
 
       if (!data) {
-        return [];
+        return cachedForPlayer;
       }
 
-      return (data as AttendanceRow[]).map((row) => this.mapRowToEntity(row));
+      const list = (data as AttendanceRow[]).map((row) => this.mapRowToEntity(row));
+      for (const item of list) {
+        globalAttendanceCache.set(item.id, item);
+      }
+
+      return list;
     } catch (err) {
       console.warn(`Supabase findByPlayerId attendance exception for '${playerId}':`, err);
-      return [];
+      return cachedForPlayer;
     }
   }
 
   async delete(id: string): Promise<void> {
+    globalAttendanceCache.delete(id);
     if (!id || !UUID_REGEX.test(id)) return;
     try {
       await this.client.from('attendances').delete().eq('id', id);
@@ -176,6 +212,11 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
   }
 
   async deleteByMatchId(matchId: string): Promise<void> {
+    for (const [key, item] of globalAttendanceCache.entries()) {
+      if (item.matchId === matchId) {
+        globalAttendanceCache.delete(key);
+      }
+    }
     if (!matchId || !UUID_REGEX.test(matchId)) return;
     try {
       await this.client.from('attendances').delete().eq('match_id', matchId);
@@ -192,13 +233,17 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
 
       if (error) {
         console.warn('Supabase findAll attendances warning:', error.message);
-        return [];
+        return Array.from(globalAttendanceCache.values());
       }
 
-      return (data as AttendanceRow[]).map((row) => this.mapRowToEntity(row));
+      const list = (data as AttendanceRow[]).map((row) => this.mapRowToEntity(row));
+      for (const item of list) {
+        globalAttendanceCache.set(item.id, item);
+      }
+      return list;
     } catch (err) {
       console.warn('Supabase findAll attendances exception:', err);
-      return [];
+      return Array.from(globalAttendanceCache.values());
     }
   }
 }

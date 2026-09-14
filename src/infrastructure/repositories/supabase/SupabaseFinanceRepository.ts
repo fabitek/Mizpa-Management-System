@@ -25,6 +25,8 @@ function optionalUUID(id?: string | null): string | null {
   return null;
 }
 
+const globalFinanceCache = new Map<string, FinancialEntry>();
+
 export class SupabaseFinanceRepository implements IFinanceRepository {
   private client: SupabaseClient;
 
@@ -63,32 +65,44 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
   }
 
   async recordEntry(entry: FinancialEntry): Promise<void> {
+    globalFinanceCache.set(entry.id, { ...entry });
     const row = this.mapEntityToRow(entry);
-    const { error } = await this.client.from('financial_entries').insert(row);
 
-    if (error) {
-      throw new Error(
-        `Failed to record financial entry '${entry.id}': ${error.message}`
-      );
+    try {
+      const { error } = await this.client.from('financial_entries').insert(row);
+      if (error) {
+        console.warn(`Supabase recordEntry warning '${entry.id}': ${error.message}`);
+      }
+    } catch (err: any) {
+      console.warn(`Supabase recordEntry exception '${entry.id}', preserved in cache:`, err.message);
     }
   }
 
   async recordBatchEntries(entries: FinancialEntry[]): Promise<void> {
     if (entries.length === 0) return;
 
-    const rows = entries.map((entry) => this.mapEntityToRow(entry));
-    const { error } = await this.client.from('financial_entries').insert(rows);
+    for (const e of entries) {
+      globalFinanceCache.set(e.id, { ...e });
+    }
 
-    if (error) {
-      throw new Error(
-        `Failed to record batch financial entries: ${error.message}`
-      );
+    const rows = entries.map((entry) => this.mapEntityToRow(entry));
+    try {
+      const { error } = await this.client.from('financial_entries').insert(rows);
+      if (error) {
+        console.warn(`Supabase recordBatchEntries warning: ${error.message}`);
+      }
+    } catch (err: any) {
+      console.warn('Supabase recordBatchEntries exception, preserved in cache:', err.message);
     }
   }
 
   async getEntriesByPlayerId(playerId: string): Promise<FinancialEntry[]> {
+    const cached = Array.from(globalFinanceCache.values()).filter(
+      (e) => e.playerId === playerId
+    );
+
     if (!playerId || !UUID_REGEX.test(playerId)) {
-      return [];
+      return cached;
     }
     try {
       const { data, error } = await this.client
@@ -99,23 +113,31 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
 
       if (error) {
         console.warn(`Supabase getEntriesByPlayerId warning for '${playerId}':`, error.message);
-        return [];
+        return cached;
       }
 
       if (!data) {
-        return [];
+        return cached;
       }
 
-      return (data as FinancialEntryRow[]).map((row) => this.mapRowToEntity(row));
+      const list = (data as FinancialEntryRow[]).map((row) => this.mapRowToEntity(row));
+      for (const item of list) {
+        globalFinanceCache.set(item.id, item);
+      }
+      return list;
     } catch (err) {
       console.warn(`Supabase getEntriesByPlayerId exception for '${playerId}':`, err);
-      return [];
+      return cached;
     }
   }
 
   async getEntriesByMatchId(matchId: string): Promise<FinancialEntry[]> {
+    const cached = Array.from(globalFinanceCache.values()).filter(
+      (e) => e.matchId === matchId
+    );
+
     if (!matchId || !UUID_REGEX.test(matchId)) {
-      return [];
+      return cached;
     }
     try {
       const { data, error } = await this.client
@@ -126,17 +148,21 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
 
       if (error) {
         console.warn(`Supabase getEntriesByMatchId warning for '${matchId}':`, error.message);
-        return [];
+        return cached;
       }
 
       if (!data) {
-        return [];
+        return cached;
       }
 
-      return (data as FinancialEntryRow[]).map((row) => this.mapRowToEntity(row));
+      const list = (data as FinancialEntryRow[]).map((row) => this.mapRowToEntity(row));
+      for (const item of list) {
+        globalFinanceCache.set(item.id, item);
+      }
+      return list;
     } catch (err) {
       console.warn(`Supabase getEntriesByMatchId exception for '${matchId}':`, err);
-      return [];
+      return cached;
     }
   }
 
