@@ -7,6 +7,8 @@ import type {
   AuthSession,
   UserRole,
   NotificationMessage,
+  OperatingExpense,
+  ExpenseCategory,
 } from './types.ts';
 
 export interface IPlayerRepository {
@@ -45,6 +47,14 @@ export interface IFinanceRepository {
   getPlayerBalance(playerId: string): Promise<number>;
 }
 
+export interface IOperatingExpenseRepository {
+  recordExpense(expense: OperatingExpense): Promise<void>;
+  findAll(): Promise<OperatingExpense[]>;
+  findByCategory(category: ExpenseCategory): Promise<OperatingExpense[]>;
+  findById(id: string): Promise<OperatingExpense | null>;
+  delete(id: string): Promise<void>;
+}
+
 export interface IGoalRepository {
   recordGoal(goal: GoalEvent): Promise<void>;
   findByMatchId(matchId: string): Promise<GoalEvent[]>;
@@ -70,3 +80,4 @@ export interface INotificationService {
   getAll(): Promise<NotificationMessage[]>;
   generateWhatsAppLink(phone: string, messageText: string): string;
 }
+

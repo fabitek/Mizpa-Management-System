@@ -6,7 +6,9 @@ import {
   getPlayerStatementUseCase,
   getMatchFinancialSummaryUseCase,
   getAllPlayersFinancialOverviewUseCase,
+  container,
 } from '../../infrastructure/container.ts';
+
 import { InvalidFinancialAmountError, MatchNotFoundError } from '../../core/domain/index.ts';
 
 export interface FinancialActionResult<T = unknown> {
@@ -144,3 +146,108 @@ export async function getTreasuryOverviewAction(
     };
   }
 }
+
+export async function recordOperatingExpenseAction(input: {
+  category: any;
+  description: string;
+  amount: number;
+  expenseDate?: string;
+  receiptUrl?: string;
+  recordedByPlayerId?: string;
+  matchId?: string;
+}): Promise<FinancialActionResult> {
+  try {
+    const expense = await container.recordOperatingExpenseUseCase.execute({
+      category: input.category,
+      description: input.description,
+      amount: input.amount,
+      expenseDate: input.expenseDate ? new Date(input.expenseDate) : new Date(),
+      receiptUrl: input.receiptUrl,
+      recordedByPlayerId: input.recordedByPlayerId,
+      matchId: input.matchId,
+    });
+
+    revalidatePath('/wallet');
+
+    return {
+      success: true,
+      message: `Egreso de $${input.amount.toLocaleString('es-CO')} COP registrado en '${input.description}'.`,
+      data: {
+        ...expense,
+        expenseDate: expense.expenseDate.toISOString(),
+        createdAt: expense.createdAt.toISOString(),
+      },
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al registrar egreso operativo.',
+      errorCode: 'OPERATING_EXPENSE_ERROR',
+    };
+  }
+}
+
+export async function getOperatingExpensesAction(): Promise<FinancialActionResult> {
+  try {
+    const summary = await container.getAllOperatingExpensesUseCase.execute();
+
+    return {
+      success: true,
+      message: 'Gastos operativos obtenidos con éxito.',
+      data: {
+        ...summary,
+        expenses: summary.expenses.map((e) => ({
+          ...e,
+          expenseDate: e.expenseDate.toISOString(),
+          createdAt: e.createdAt.toISOString(),
+        })),
+      },
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al consultar gastos operativos.',
+      errorCode: 'OPERATING_EXPENSE_ERROR',
+    };
+  }
+}
+
+export async function deleteOperatingExpenseAction(
+  expenseId: string
+): Promise<FinancialActionResult> {
+  try {
+    await container.deleteOperatingExpenseUseCase.execute(expenseId);
+    revalidatePath('/wallet');
+
+    return {
+      success: true,
+      message: 'Gasto operativo eliminado correctamente.',
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al eliminar gasto operativo.',
+      errorCode: 'DELETE_EXPENSE_ERROR',
+    };
+  }
+}
+
+export async function parseReceiptOcrAction(
+  rawText: string
+): Promise<FinancialActionResult> {
+  try {
+    const result = container.processReceiptOcrUseCase.execute(rawText);
+    return {
+      success: true,
+      message: `Comprobante analizado con éxito (${result.detectedBank}).`,
+      data: result,
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al analizar el comprobante.',
+      errorCode: 'OCR_ERROR',
+    };
+  }
+}
+

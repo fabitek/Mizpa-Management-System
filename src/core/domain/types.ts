@@ -156,3 +156,46 @@ export interface NotificationMessage {
   sentAt?: Date;
   createdAt: Date;
 }
+
+export type ExpenseCategory =
+  | 'BALLS_EQUIPMENT'   // Balones y equipamiento de juego
+  | 'BIBS_VESTS'        // Petos y chalecos
+  | 'HYDRATION'         // Hidratación, agua y bebidas
+  | 'REFEREE_STAFF'     // Arbitraje y planilleros
+  | 'FIRST_AID'         // Botiquín y primeros auxilios
+  | 'AWARDS_CAPTAIN'    // Cinta de capitán y trofeos
+  | 'FIELD_MAINTENANCE' // Mantenimiento, luces y logística
+  | 'OTHER';            // Otros gastos varios
+
+export interface OperatingExpense {
+  id: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  expenseDate: Date;
+  receiptUrl?: string;
+  recordedByPlayerId?: string;
+  matchId?: string | null;
+  createdAt: Date;
+}
+
+export type DetectedBank =
+  | 'NEQUI'
+  | 'BANCOLOMBIA'
+  | 'DAVIPLATA'
+  | 'TRANSFIYA'
+  | 'DALE'
+  | 'BBVA'
+  | 'OTHER';
+
+export interface ReceiptOcrResult {
+  detectedBank: DetectedBank;
+  amount?: number;
+  referenceNumber?: string;
+  transactionDate?: string;
+  recipientName?: string;
+  senderName?: string;
+  rawText?: string;
+  confidence: number;
+}
+

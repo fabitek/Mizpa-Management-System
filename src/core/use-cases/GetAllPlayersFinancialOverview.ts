@@ -1,4 +1,4 @@
-import type { IFinanceRepository } from '../domain/index.ts';
+import type { IFinanceRepository, IOperatingExpenseRepository } from '../domain/index.ts';
 
 export interface PlayerBalanceItem {
   playerId: string;
@@ -13,14 +13,21 @@ export interface TreasuryOverview {
   totalOutstandingDebt: number;
   totalCreditsCollected: number;
   totalDebitsIssued: number;
+  totalOperatingExpenses: number;
+  netPettyCashBalance: number;
   playerBalances: PlayerBalanceItem[];
 }
 
 export class GetAllPlayersFinancialOverviewUseCase {
   private readonly financeRepository: IFinanceRepository;
+  private readonly expenseRepository?: IOperatingExpenseRepository;
 
-  constructor(financeRepository: IFinanceRepository) {
+  constructor(
+    financeRepository: IFinanceRepository,
+    expenseRepository?: IOperatingExpenseRepository
+  ) {
     this.financeRepository = financeRepository;
+    this.expenseRepository = expenseRepository;
   }
 
   async execute(playerIds: string[]): Promise<TreasuryOverview> {
@@ -69,14 +76,28 @@ export class GetAllPlayersFinancialOverviewUseCase {
       });
     }
 
+    let totalOperatingExpenses = 0;
+    if (this.expenseRepository) {
+      try {
+        const expenses = await this.expenseRepository.findAll();
+        totalOperatingExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+      } catch (err) {
+        console.warn('Could not fetch operating expenses for overview:', err);
+      }
+    }
+
     const totalTreasuryBalance = totalCreditsCollected - totalDebitsIssued;
+    const netPettyCashBalance = totalCreditsCollected - totalOperatingExpenses;
 
     return {
       totalTreasuryBalance,
       totalOutstandingDebt,
       totalCreditsCollected,
       totalDebitsIssued,
+      totalOperatingExpenses,
+      netPettyCashBalance,
       playerBalances,
     };
   }
 }
+

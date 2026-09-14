@@ -1,12 +1,17 @@
 import {
   getAllPlayersFinancialOverviewUseCase,
   getPlayerStatementUseCase,
+  getAllOperatingExpensesUseCase,
   playerRepository,
 } from '../../infrastructure/container.ts';
 import { initialPlayers } from '../../infrastructure/seed-data.ts';
 import { PlayerWalletView } from '../../components/wallet/PlayerWalletView.tsx';
 
-import type { TreasuryOverview, PlayerFinancialStatement } from '../../core/use-cases/index.ts';
+import type {
+  TreasuryOverview,
+  PlayerFinancialStatement,
+  OperatingExpensesSummary,
+} from '../../core/use-cases/index.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +32,8 @@ export default async function WalletPage() {
     totalOutstandingDebt: 0,
     totalCreditsCollected: 0,
     totalDebitsIssued: 0,
+    totalOperatingExpenses: 0,
+    netPettyCashBalance: 0,
     playerBalances: [],
   };
 
@@ -55,6 +62,37 @@ export default async function WalletPage() {
     }
   }
 
+  let initialExpensesSummary: OperatingExpensesSummary = {
+    expenses: [],
+    totalAmount: 0,
+    categoryBreakdown: {
+      BALLS_EQUIPMENT: 0,
+      BIBS_VESTS: 0,
+      HYDRATION: 0,
+      REFEREE_STAFF: 0,
+      FIRST_AID: 0,
+      AWARDS_CAPTAIN: 0,
+      FIELD_MAINTENANCE: 0,
+      OTHER: 0,
+    },
+    countByCategory: {
+      BALLS_EQUIPMENT: 0,
+      BIBS_VESTS: 0,
+      HYDRATION: 0,
+      REFEREE_STAFF: 0,
+      FIRST_AID: 0,
+      AWARDS_CAPTAIN: 0,
+      FIELD_MAINTENANCE: 0,
+      OTHER: 0,
+    },
+  };
+
+  try {
+    initialExpensesSummary = await getAllOperatingExpensesUseCase.execute();
+  } catch (err) {
+    console.warn('WalletPage operating expenses warning:', err);
+  }
+
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 py-10 px-4 sm:px-6 lg:px-8">
       <PlayerWalletView
@@ -62,7 +100,9 @@ export default async function WalletPage() {
         initialOverview={overview}
         initialSelectedPlayerId={firstPlayerId}
         initialStatement={initialStatement}
+        initialExpensesSummary={initialExpensesSummary}
       />
     </main>
   );
 }
+

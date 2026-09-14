@@ -22,3 +22,8 @@ export * from './GetNotificationsLog.ts';
 export * from './SwitchSessionUser.ts';
 export * from './UpdateMatch.ts';
 export * from './DeleteMatch.ts';
+export * from './RecordOperatingExpense.ts';
+export * from './GetAllOperatingExpenses.ts';
+export * from './DeleteOperatingExpense.ts';
+export * from './ProcessReceiptOcr.ts';
+

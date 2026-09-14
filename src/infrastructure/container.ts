@@ -3,6 +3,7 @@ import type {
   IPlayerRepository,
   IAttendanceRepository,
   IFinanceRepository,
+  IOperatingExpenseRepository,
   IGoalRepository,
   IAuthService,
   INotificationService,
@@ -11,6 +12,7 @@ import { InMemoryMatchRepository } from './repositories/in-memory/InMemoryMatchR
 import { InMemoryPlayerRepository } from './repositories/in-memory/InMemoryPlayerRepository.ts';
 import { InMemoryAttendanceRepository } from './repositories/in-memory/InMemoryAttendanceRepository.ts';
 import { InMemoryFinanceRepository } from './repositories/in-memory/InMemoryFinanceRepository.ts';
+import { InMemoryOperatingExpenseRepository } from './repositories/in-memory/InMemoryOperatingExpenseRepository.ts';
 import { InMemoryGoalRepository } from './repositories/in-memory/InMemoryGoalRepository.ts';
 import { InMemoryAuthService } from './repositories/in-memory/InMemoryAuthService.ts';
 import { InMemoryNotificationService } from './repositories/in-memory/InMemoryNotificationService.ts';
@@ -19,6 +21,7 @@ import {
   SupabasePlayerRepository,
   SupabaseAttendanceRepository,
   SupabaseFinanceRepository,
+  SupabaseOperatingExpenseRepository,
   SupabaseGoalRepository,
 } from './repositories/supabase/index.ts';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
@@ -35,6 +38,10 @@ import {
   GetPlayerStatementUseCase,
   GetMatchFinancialSummaryUseCase,
   GetAllPlayersFinancialOverviewUseCase,
+  RecordOperatingExpenseUseCase,
+  GetAllOperatingExpensesUseCase,
+  DeleteOperatingExpenseUseCase,
+  ProcessReceiptOcrUseCase,
   RecordGoalEventUseCase,
   GetTopScorersUseCase,
   GetPlayerStatsUseCase,
@@ -57,6 +64,7 @@ export interface DIContainer {
   playerRepository: IPlayerRepository;
   attendanceRepository: IAttendanceRepository;
   financeRepository: IFinanceRepository;
+  operatingExpenseRepository: IOperatingExpenseRepository;
   goalRepository: IGoalRepository;
   authService: IAuthService;
   notificationService: INotificationService;
@@ -74,10 +82,15 @@ export interface DIContainer {
   getPlayerStatementUseCase: GetPlayerStatementUseCase;
   getMatchFinancialSummaryUseCase: GetMatchFinancialSummaryUseCase;
   getAllPlayersFinancialOverviewUseCase: GetAllPlayersFinancialOverviewUseCase;
+  recordOperatingExpenseUseCase: RecordOperatingExpenseUseCase;
+  getAllOperatingExpensesUseCase: GetAllOperatingExpensesUseCase;
+  deleteOperatingExpenseUseCase: DeleteOperatingExpenseUseCase;
+  processReceiptOcrUseCase: ProcessReceiptOcrUseCase;
   recordGoalEventUseCase: RecordGoalEventUseCase;
   getTopScorersUseCase: GetTopScorersUseCase;
   getPlayerStatsUseCase: GetPlayerStatsUseCase;
   assignMatchMvpUseCase: AssignMatchMvpUseCase;
+
   getLeaderboardOverviewUseCase: GetLeaderboardOverviewUseCase;
   sendMatchConvocationUseCase: SendMatchConvocationUseCase;
   sendSettlementAlertsUseCase: SendSettlementAlertsUseCase;
@@ -102,6 +115,7 @@ function createContainer(): DIContainer {
   let playerRepository: IPlayerRepository;
   let attendanceRepository: IAttendanceRepository;
   let financeRepository: IFinanceRepository;
+  let operatingExpenseRepository: IOperatingExpenseRepository;
   let goalRepository: IGoalRepository;
   let authService: IAuthService;
   let notificationService: INotificationService;
@@ -117,6 +131,7 @@ function createContainer(): DIContainer {
       playerRepository = new SupabasePlayerRepository(client);
       attendanceRepository = new SupabaseAttendanceRepository(client);
       financeRepository = new SupabaseFinanceRepository(client);
+      operatingExpenseRepository = new SupabaseOperatingExpenseRepository(client);
       goalRepository = new SupabaseGoalRepository(client);
       authService = new InMemoryAuthService(initialPlayers);
       notificationService = new InMemoryNotificationService(initialNotifications);
@@ -130,6 +145,7 @@ function createContainer(): DIContainer {
       playerRepository = new InMemoryPlayerRepository(initialPlayers);
       attendanceRepository = new InMemoryAttendanceRepository(initialAttendances);
       financeRepository = new InMemoryFinanceRepository();
+      operatingExpenseRepository = new InMemoryOperatingExpenseRepository();
       goalRepository = new InMemoryGoalRepository(initialGoals);
       authService = new InMemoryAuthService(initialPlayers);
       notificationService = new InMemoryNotificationService(initialNotifications);
@@ -139,6 +155,7 @@ function createContainer(): DIContainer {
     playerRepository = new InMemoryPlayerRepository(initialPlayers);
     attendanceRepository = new InMemoryAttendanceRepository(initialAttendances);
     financeRepository = new InMemoryFinanceRepository();
+    operatingExpenseRepository = new InMemoryOperatingExpenseRepository();
     goalRepository = new InMemoryGoalRepository(initialGoals);
     authService = new InMemoryAuthService(initialPlayers);
     notificationService = new InMemoryNotificationService(initialNotifications);
@@ -177,12 +194,18 @@ function createContainer(): DIContainer {
     attendanceRepository
   );
   const getAllPlayersFinancialOverviewUseCase = new GetAllPlayersFinancialOverviewUseCase(
-    financeRepository
+    financeRepository,
+    operatingExpenseRepository
   );
+
+  const recordOperatingExpenseUseCase = new RecordOperatingExpenseUseCase(operatingExpenseRepository);
+  const getAllOperatingExpensesUseCase = new GetAllOperatingExpensesUseCase(operatingExpenseRepository);
+  const deleteOperatingExpenseUseCase = new DeleteOperatingExpenseUseCase(operatingExpenseRepository);
+  const processReceiptOcrUseCase = new ProcessReceiptOcrUseCase();
 
   const recordGoalEventUseCase = new RecordGoalEventUseCase(matchRepository, goalRepository);
   const getTopScorersUseCase = new GetTopScorersUseCase(goalRepository, attendanceRepository);
-  const getPlayerStatsUseCase = new GetPlayerStatsUseCase(
+  const getPlayerStatsUseCaseInst = new GetPlayerStatsUseCase(
     goalRepository,
     attendanceRepository,
     matchRepository,
@@ -218,6 +241,7 @@ function createContainer(): DIContainer {
     playerRepository,
     attendanceRepository,
     financeRepository,
+    operatingExpenseRepository,
     goalRepository,
     authService,
     notificationService,
@@ -235,9 +259,13 @@ function createContainer(): DIContainer {
     getPlayerStatementUseCase,
     getMatchFinancialSummaryUseCase,
     getAllPlayersFinancialOverviewUseCase,
+    recordOperatingExpenseUseCase,
+    getAllOperatingExpensesUseCase,
+    deleteOperatingExpenseUseCase,
+    processReceiptOcrUseCase,
     recordGoalEventUseCase,
     getTopScorersUseCase,
-    getPlayerStatsUseCase,
+    getPlayerStatsUseCase: getPlayerStatsUseCaseInst,
     assignMatchMvpUseCase,
     getLeaderboardOverviewUseCase,
     sendMatchConvocationUseCase,
@@ -256,6 +284,7 @@ export const {
   playerRepository,
   attendanceRepository,
   financeRepository,
+  operatingExpenseRepository,
   goalRepository,
   authService,
   notificationService,
@@ -273,6 +302,10 @@ export const {
   getPlayerStatementUseCase,
   getMatchFinancialSummaryUseCase,
   getAllPlayersFinancialOverviewUseCase,
+  recordOperatingExpenseUseCase,
+  getAllOperatingExpensesUseCase,
+  deleteOperatingExpenseUseCase,
+  processReceiptOcrUseCase,
   recordGoalEventUseCase,
   getTopScorersUseCase,
   getPlayerStatsUseCase,
@@ -284,3 +317,4 @@ export const {
   getNotificationsLogUseCase,
   switchSessionUserUseCase,
 } = container;
+
