@@ -123,6 +123,7 @@ export function NotificationsView({
 
   const formattedDate = currentMatch
     ? new Date(currentMatch.date).toLocaleString('es-CO', {
+        timeZone: 'America/Bogota',
         weekday: 'long',
         year: 'numeric',
         month: 'long',
@@ -395,7 +396,7 @@ export function NotificationsView({
                     >
                       {matchList.map((m) => (
                         <option key={m.id} value={m.id}>
-                          {m.location} — {new Date(m.date).toLocaleDateString('es-CO', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} ({m.status})
+                          {m.location} — {new Date(m.date).toLocaleDateString('es-CO', { timeZone: 'America/Bogota', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} ({m.status})
                         </option>
                       ))}
                     </select>

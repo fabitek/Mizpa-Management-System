@@ -115,6 +115,7 @@ export function PublicRsvpView({
   const getPlayer = (id: string) => players.find((p) => p.id === id);
 
   const formattedDate = new Date(match.date).toLocaleString('es-CO', {
+    timeZone: 'America/Bogota',
     weekday: 'long',
     year: 'numeric',
     month: 'long',

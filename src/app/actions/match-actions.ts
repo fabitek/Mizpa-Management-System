@@ -94,6 +94,17 @@ export async function settleMatchAction(
   }
 }
 
+function parseColombiaDate(dateInput: string | Date): Date {
+  if (dateInput instanceof Date) return dateInput;
+  const trimmed = dateInput.trim();
+  // If string matches YYYY-MM-DDTHH:mm or YYYY-MM-DDTHH:mm:ss without timezone
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+    const hasSeconds = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(trimmed);
+    return new Date(`${trimmed}${hasSeconds ? '' : ':00'}-05:00`);
+  }
+  return new Date(trimmed);
+}
+
 export async function createMatchAction(input: {
   location: string;
   locationAddress?: string;
@@ -107,7 +118,7 @@ export async function createMatchAction(input: {
   openImmediately?: boolean;
 }): Promise<CreateMatchActionResult> {
   try {
-    const parsedDate = new Date(input.date);
+    const parsedDate = parseColombiaDate(input.date);
     if (isNaN(parsedDate.getTime())) {
       return {
         success: false,
@@ -199,7 +210,7 @@ export async function updateMatchAction(input: {
   try {
     let parsedDate: Date | undefined;
     if (input.date) {
-      parsedDate = new Date(input.date);
+      parsedDate = parseColombiaDate(input.date);
       if (isNaN(parsedDate.getTime())) {
         return {
           success: false,

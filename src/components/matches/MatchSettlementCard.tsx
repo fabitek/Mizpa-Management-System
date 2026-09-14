@@ -149,13 +149,26 @@ export function MatchSettlementCard({
     setEditLocation(match.location);
     setEditLocationAddress(match.locationAddress || '');
     setEditGoogleMapsUrl(match.googleMapsUrl || '');
-    const d = new Date(match.date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    setEditDate(`${year}-${month}-${day}T${hours}:${minutes}`);
+    
+    // Format to YYYY-MM-DDTHH:mm specifically in America/Bogota timezone
+    const formatter = new Intl.DateTimeFormat('es-CO', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(new Date(match.date));
+    const getPart = (type: string) => parts.find((p) => p.type === type)?.value || '00';
+    const year = getPart('year');
+    const month = getPart('month');
+    const day = getPart('day');
+    const hour = getPart('hour');
+    const minute = getPart('minute');
+    setEditDate(`${year}-${month}-${day}T${hour}:${minute}`);
+
     setEditPitchCost(match.pitchRentalCost);
     setEditExtraCosts(match.extraCosts || 0);
     setEditDurationHours(match.durationHours || 2);
@@ -409,7 +422,7 @@ export function MatchSettlementCard({
                   >
                     {matches.map((m) => (
                       <option key={m.id} value={m.id} className="bg-zinc-900 text-zinc-100">
-                        {m.location} ({new Date(m.date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })})
+                        {m.location} ({new Date(m.date).toLocaleDateString('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'short' })})
                       </option>
                     ))}
                   </select>
@@ -438,6 +451,7 @@ export function MatchSettlementCard({
               <span className="inline-flex items-center gap-1.5" suppressHydrationWarning>
                 <Calendar className="w-4 h-4 text-emerald-400" />
                 {new Date(match.date).toLocaleDateString('es-CO', {
+                  timeZone: 'America/Bogota',
                   weekday: 'short',
                   year: 'numeric',
                   month: 'short',
@@ -914,6 +928,7 @@ export function MatchSettlementCard({
               Estás a punto de eliminar el partido en <strong className="text-white">{match.location}</strong> programado para el{' '}
               <strong className="text-white">
                 {new Date(match.date).toLocaleDateString('es-CO', {
+                  timeZone: 'America/Bogota',
                   weekday: 'short',
                   month: 'short',
                   day: 'numeric',
