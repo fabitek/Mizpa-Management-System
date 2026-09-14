@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS public.attendances (
     registered_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     registered_by_player_id UUID REFERENCES public.players(id) ON DELETE SET NULL,
     guest_name TEXT,
+    guest_type TEXT DEFAULT 'PLAYER' CHECK (guest_type IN ('PLAYER', 'COMPANION')),
     has_vehicle BOOLEAN DEFAULT false,
     vehicle_plate TEXT
 );

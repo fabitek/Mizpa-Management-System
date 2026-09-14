@@ -18,6 +18,7 @@ import {
   registerAttendanceAction,
   cancelAttendanceAction,
   checkinAttendanceAction,
+  updateAttendanceGuestTypeAction,
 } from '../../app/actions/rsvp-actions.ts';
 import type { Match, Attendance, Player, MatchStatus } from '../../core/domain/index.ts';
 import {
@@ -45,6 +46,7 @@ import {
   Copy,
   Edit2,
   Trash2,
+  RefreshCw,
 } from 'lucide-react';
 
 interface MatchSettlementCardProps {
@@ -113,6 +115,7 @@ export function MatchSettlementCard({
   // State for adding a guest (+1)
   const [selectedHostPlayerId, setSelectedHostPlayerId] = useState<string>(players[0]?.id || '');
   const [guestName, setGuestName] = useState<string>('');
+  const [guestTypeForNewGuest, setGuestTypeForNewGuest] = useState<'PLAYER' | 'COMPANION'>('PLAYER');
 
   const isSettled = match ? match.status === 'SETTLED' : false;
   const durationHours = match?.durationHours ?? 2;
@@ -120,16 +123,24 @@ export function MatchSettlementCard({
   const vehicleParkingFee = durationHours * parkingFeePerHour;
 
   const maxPlayers = match?.maxPlayers || 18;
-  const attendedCount = attendances.filter((a) => a.status === 'ATTENDED').length;
-  const confirmedCount = attendances.filter((a) => a.status === 'CONFIRMED' || a.status === 'ATTENDED').length;
-  const waitlistCount = attendances.filter((a) => a.status === 'WAITLIST').length;
+  const attendedCount = attendances.filter((a) => a.status === 'ATTENDED' && a.guestType !== 'COMPANION').length;
+  const confirmedCount = attendances.filter((a) => (a.status === 'CONFIRMED' || a.status === 'ATTENDED') && a.guestType !== 'COMPANION').length;
+  const waitlistCount = attendances.filter((a) => a.status === 'WAITLIST' && a.guestType !== 'COMPANION').length;
+  const companionCount = attendances.filter((a) => (a.status === 'CONFIRMED' || a.status === 'ATTENDED') && a.guestType === 'COMPANION').length;
+
+  const fullCapacityPitchFee = match ? Math.ceil(match.pitchRentalCost / maxPlayers) : 0;
+  const dynamicPitchFee = match
+    ? confirmedCount > 0
+      ? Math.ceil(match.pitchRentalCost / confirmedCount)
+      : fullCapacityPitchFee
+    : 0;
 
   const basePitchFee = match
     ? isSettled
       ? match.settledFeePerPlayer ?? 0
       : attendedCount > 0
       ? Math.ceil(match.pitchRentalCost / attendedCount)
-      : Math.ceil(match.pitchRentalCost / maxPlayers)
+      : dynamicPitchFee
     : 0;
 
   const handleMatchSwitch = (matchId: string) => {
@@ -289,12 +300,32 @@ export function MatchSettlementCard({
     if (!match || !guestName.trim()) return;
 
     startTransition(async () => {
-      const res = await registerAttendanceAction(match.id, selectedHostPlayerId, guestName.trim());
+      const res = await registerAttendanceAction(
+        match.id,
+        selectedHostPlayerId,
+        guestName.trim(),
+        false,
+        undefined,
+        guestTypeForNewGuest
+      );
       setFeedback(res);
       if (res.success && res.data) {
         const newAtt = (res.data as any).attendance;
         setAttendances((prev) => [...prev, newAtt]);
         setGuestName('');
+      }
+    });
+  };
+
+  const handleToggleGuestType = (attendanceId: string, currentType?: 'PLAYER' | 'COMPANION') => {
+    const nextType: 'PLAYER' | 'COMPANION' = currentType === 'COMPANION' ? 'PLAYER' : 'COMPANION';
+    startTransition(async () => {
+      const res = await updateAttendanceGuestTypeAction(attendanceId, nextType);
+      setFeedback(res);
+      if (res.success && res.data) {
+        setAttendances((prev) =>
+          prev.map((a) => (a.id === attendanceId ? { ...a, guestType: nextType } : a))
+        );
       }
     });
   };
@@ -344,7 +375,10 @@ export function MatchSettlementCard({
     });
     const lines = vehicleList.map((a, i) => {
       const host = getPlayer(a.playerId);
-      const name = a.guestName ? `${a.guestName} (+1 de ${host?.fullName || 'Anfitrión'})` : host?.fullName || a.playerId;
+      const isComp = a.guestType === 'COMPANION';
+      const name = a.guestName
+        ? `${a.guestName} (${isComp ? 'Acompañante' : 'Invitado'} de ${host?.fullName || 'Anfitrión'})`
+        : host?.fullName || a.playerId;
       return `${i + 1}. 🚗 Placa: ${a.vehiclePlate || 'Registrado'} — ${name}`;
     });
     const text = `🚗 *PLANILLA DE VEHÍCULOS / PARQUEADERO - MIZPA FC*\n📍 *Sede:* ${match.location}\n📅 *Fecha:* ${formattedDate}\n\n${lines.join('\n')}\n\nTotal autorizados: ${vehicleList.length} vehículos.`;
@@ -365,13 +399,16 @@ export function MatchSettlementCard({
 
   const renderAttendanceName = (att: Attendance) => {
     const hostPlayer = getPlayer(att.playerId);
+    const isCompanion = att.guestType === 'COMPANION';
     return (
       <div className="space-y-0.5">
         {att.guestName ? (
           <div>
-            <span className="font-semibold text-emerald-300">👥 {att.guestName}</span>
+            <span className={isCompanion ? "font-semibold text-blue-300" : "font-semibold text-emerald-300"}>
+              {isCompanion ? '👥 ' : '⚽ '} {att.guestName}
+            </span>
             <span className="ml-2 text-xs text-zinc-400">
-              (Invitado +1 de {getPlayerDisplayName(hostPlayer, att.playerId)})
+              ({isCompanion ? 'Acompañante • Barra' : 'Invitado Jugador'} de {getPlayerDisplayName(hostPlayer, att.playerId)})
             </span>
           </div>
         ) : (
@@ -1049,6 +1086,10 @@ export function MatchSettlementCard({
                   <span className="text-emerald-400 font-semibold">{attendedCount} jugadores</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-zinc-800">
+                  <span>Acompañantes / Barra (No juegan):</span>
+                  <span className="text-blue-400 font-semibold">{companionCount} acompañantes 👥</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-zinc-800">
                   <span>Vehículos Registrados:</span>
                   <span className="text-zinc-200 font-semibold">{vehicleList.length} vehículos 🚗</span>
                 </div>
@@ -1063,7 +1104,7 @@ export function MatchSettlementCard({
             <Card className="border-zinc-800 bg-zinc-900/60 shadow-md">
               <CardHeader className="pb-2">
                 <CardDescription className="text-zinc-400 flex items-center gap-1.5 text-xs">
-                  <DollarSign className="w-4 h-4 text-emerald-400" /> Cuota Cancha Estimada / Jugador
+                  <DollarSign className="w-4 h-4 text-emerald-400" /> Cuota Dinámica por Jugador
                 </CardDescription>
                 <CardTitle className="text-2xl font-mono text-emerald-400">
                   ${basePitchFee.toLocaleString('es-CO')} COP
@@ -1071,9 +1112,15 @@ export function MatchSettlementCard({
               </CardHeader>
               <CardContent className="text-xs text-zinc-400 space-y-1">
                 <div className="flex justify-between py-1 border-b border-zinc-800">
-                  <span>Cálculo Cancha:</span>
-                  <span className="font-mono text-zinc-300">
-                    Cancha / {attendedCount > 0 ? `${attendedCount} presentes` : `${maxPlayers} cupos`}
+                  <span>Base Cupo Lleno ({maxPlayers} jg):</span>
+                  <span className="font-mono text-zinc-400 font-medium">
+                    ${fullCapacityPitchFee.toLocaleString('es-CO')} COP
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-zinc-800">
+                  <span>Inscritos Actuales ({confirmedCount} jg):</span>
+                  <span className="font-mono text-amber-300 font-semibold">
+                    ${dynamicPitchFee.toLocaleString('es-CO')} COP
                   </span>
                 </div>
                 <div className="flex justify-between py-1">
@@ -1126,12 +1173,12 @@ export function MatchSettlementCard({
                   <UserPlus className="w-4 h-4 text-emerald-400" /> Registrar Invitado (+1) para este Partido
                 </CardTitle>
                 <CardDescription className="text-xs text-zinc-400">
-                  Un jugador anfitrión puede registrar acompañantes (+1, +2). La cuota del invitado se cargará al jugador anfitrión al liquidar.
+                  Clasifica si el invitado jugará en cancha (ocupa cupo y paga cuota) o es acompañante/barra (no juega y cuota cancha es $0).
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleAddGuest} className="flex flex-col sm:flex-row gap-3 items-end">
-                  <div className="w-full sm:w-1/3">
+                  <div className="w-full sm:w-1/4">
                     <label className="text-xs text-zinc-400 block mb-1">Jugador Anfitrión:</label>
                     <select
                       value={selectedHostPlayerId}
@@ -1145,11 +1192,22 @@ export function MatchSettlementCard({
                       ))}
                     </select>
                   </div>
+                  <div className="w-full sm:w-1/4">
+                    <label className="text-xs text-zinc-400 block mb-1">Tipo de Invitado:</label>
+                    <select
+                      value={guestTypeForNewGuest}
+                      onChange={(e) => setGuestTypeForNewGuest(e.target.value as 'PLAYER' | 'COMPANION')}
+                      className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    >
+                      <option value="PLAYER">⚽ Invitado Jugador (Juega)</option>
+                      <option value="COMPANION">👥 Acompañante (No juega - $0)</option>
+                    </select>
+                  </div>
                   <div className="w-full sm:flex-1">
                     <label className="text-xs text-zinc-400 block mb-1">Nombre del Invitado (+1):</label>
                     <input
                       type="text"
-                      placeholder="Ej: Camilo Andrés (Amigo)"
+                      placeholder="Ej: Camilo Andrés / Natalia Cifuentes"
                       value={guestName}
                       onChange={(e) => setGuestName(e.target.value)}
                       className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs rounded-md px-3 py-2 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
@@ -1161,7 +1219,7 @@ export function MatchSettlementCard({
                     size="sm"
                     className="w-full sm:w-auto text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
                   >
-                    + Registrar Invitado (+1)
+                    + Registrar Invitado
                   </Button>
                 </form>
               </CardContent>
@@ -1209,6 +1267,7 @@ export function MatchSettlementCard({
                     <TableRow className="border-zinc-800 hover:bg-transparent">
                       <TableHead className="w-8">#</TableHead>
                       <TableHead>Jugador / Invitado</TableHead>
+                      <TableHead>Rol / Tipo</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Cuota Asignada</TableHead>
                       {!isSettled && <TableHead className="text-right">Acciones de Cancha</TableHead>}
@@ -1216,6 +1275,7 @@ export function MatchSettlementCard({
                   </TableHeader>
                   <TableBody>
                     {attendances.map((att, idx) => {
+                      const isCompanion = att.guestType === 'COMPANION';
                       const isAttended = att.status === 'ATTENDED';
                       const isWaitlist = att.status === 'WAITLIST';
                       const isCancelled = att.status === 'CANCELLED';
@@ -1229,10 +1289,11 @@ export function MatchSettlementCard({
                         : 'default';
 
                       const isVehicleDriver = !!(att.hasVehicle || att.vehiclePlate);
-                      const playerFee = basePitchFee + (isVehicleDriver ? vehicleParkingFee : 0);
+                      const pitchFee = isCompanion ? 0 : basePitchFee;
+                      const playerFee = pitchFee + (isVehicleDriver ? vehicleParkingFee : 0);
 
                       return (
-                        <TableRow key={att.id} className={isCancelled ? 'opacity-50' : ''}>
+                        <TableRow key={att.id} className={isCancelled ? 'opacity-50' : isCompanion ? 'bg-blue-950/10' : ''}>
                           <TableCell className="text-xs font-mono text-zinc-500 w-8">
                             #{idx + 1}
                           </TableCell>
@@ -1240,12 +1301,32 @@ export function MatchSettlementCard({
                             {renderAttendanceName(att)}
                           </TableCell>
                           <TableCell>
+                            {isCompanion ? (
+                              <Badge variant="info" className="text-[10px]">
+                                👥 Acompañante
+                              </Badge>
+                            ) : (
+                              <Badge variant="success" className="text-[10px]">
+                                ⚽ Jugador
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
                             <Badge variant={badgeVariant} className="text-[10px]">
                               {att.status}
                             </Badge>
                           </TableCell>
                           <TableCell className="font-mono text-xs">
-                            {isAttended ? (
+                            {isCompanion ? (
+                              <div>
+                                <span className="font-semibold text-blue-300">
+                                  ${playerFee.toLocaleString('es-CO')} COP
+                                </span>
+                                <span className="text-[10px] text-zinc-400 block font-normal">
+                                  ($0 cancha {isVehicleDriver ? `+ 🚗 $${vehicleParkingFee.toLocaleString('es-CO')} parqueadero` : ''})
+                                </span>
+                              </div>
+                            ) : isAttended ? (
                               <div>
                                 <span className="font-bold text-emerald-400">
                                   ${playerFee.toLocaleString('es-CO')} COP
@@ -1271,7 +1352,20 @@ export function MatchSettlementCard({
                           </TableCell>
                           {!isSettled && (
                             <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1.5">
+                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                {att.guestName && !isCancelled && (
+                                  <Button
+                                    onClick={() => handleToggleGuestType(att.id, att.guestType)}
+                                    disabled={isPending}
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-[10px] h-7 px-2 border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                                    title="Cambiar entre Jugador (juega) y Acompañante (no juega)"
+                                  >
+                                    <RefreshCw className="w-3 h-3 mr-1 text-emerald-400" />
+                                    {isCompanion ? 'Hacer Jugador ⚽' : 'Hacer Acompañante 👥'}
+                                  </Button>
+                                )}
                                 {!isCancelled && !isWaitlist && (
                                   <Button
                                     onClick={() => handleCheckinToggle(att.id, att.status)}

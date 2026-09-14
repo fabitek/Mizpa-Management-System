@@ -8,6 +8,7 @@ import {
   openMatchRegistrationUseCase,
   createPlayerUseCase,
   playerRepository,
+  attendanceRepository,
 } from '../../infrastructure/container.ts';
 import {
   MatchNotFoundError,
@@ -55,13 +56,15 @@ export async function registerAttendanceAction(
   playerId: string,
   guestName?: string,
   hasVehicle?: boolean,
-  vehiclePlate?: string
+  vehiclePlate?: string,
+  guestType?: 'PLAYER' | 'COMPANION'
 ): Promise<ActionResult> {
   try {
     const result = await registerAttendanceUseCase.execute({
       matchId,
       playerId,
       guestName,
+      guestType,
       hasVehicle,
       vehiclePlate,
     });
@@ -69,9 +72,16 @@ export async function registerAttendanceAction(
     revalidatePath('/matches');
     revalidatePath(`/rsvp/${matchId}`);
 
-    const displayName = guestName ? `Invitado (+1: ${guestName})` : 'Jugador';
+    const isCompanion = guestType === 'COMPANION';
+    const displayName = guestName
+      ? isCompanion
+        ? `Acompañante (+1: ${guestName} - No juega)`
+        : `Invitado (+1: ${guestName} - Jugador)`
+      : 'Jugador';
     const vehicleMsg = hasVehicle && vehiclePlate ? ` (Vehículo: ${vehiclePlate.toUpperCase()})` : '';
-    const statusMsg = result.isWaitlist
+    const statusMsg = isCompanion
+      ? `${displayName}${vehicleMsg} registrado como ACOMPAÑANTE / ESPECTADOR.`
+      : result.isWaitlist
       ? `${displayName}${vehicleMsg} ingresó en LISTA DE ESPERA (Cupo lleno).`
       : `${displayName}${vehicleMsg} CONFIRMADO en cancha (${result.activeConfirmedCount}/${result.maxPlayers}).`;
 
@@ -210,3 +220,43 @@ export async function openMatchRegistrationAction(
     };
   }
 }
+
+export async function updateAttendanceGuestTypeAction(
+  attendanceId: string,
+  guestType: 'PLAYER' | 'COMPANION'
+): Promise<ActionResult> {
+  try {
+    const attendance = await attendanceRepository.findById(attendanceId);
+    if (!attendance) {
+      return {
+        success: false,
+        message: 'Registro de asistencia no encontrado.',
+        errorCode: 'ATTENDANCE_NOT_FOUND',
+      };
+    }
+
+    const updatedAttendance = {
+      ...attendance,
+      guestType,
+    };
+
+    await attendanceRepository.update(updatedAttendance);
+
+    revalidatePath('/matches');
+    revalidatePath(`/rsvp/${attendance.matchId}`);
+
+    const typeLabel = guestType === 'COMPANION' ? 'Acompañante (No juega)' : 'Invitado Jugador (Juega cancha)';
+    return {
+      success: true,
+      message: `Tipo de invitado cambiado a: ${typeLabel}`,
+      data: updatedAttendance,
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al actualizar tipo de invitado.',
+      errorCode: 'UNKNOWN_ERROR',
+    };
+  }
+}
+

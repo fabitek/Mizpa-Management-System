@@ -55,6 +55,7 @@ export interface Attendance {
   registeredAt: Date;
   registeredByPlayerId?: string;
   guestName?: string;
+  guestType?: 'PLAYER' | 'COMPANION';
   hasVehicle?: boolean;
   vehiclePlate?: string;
 }

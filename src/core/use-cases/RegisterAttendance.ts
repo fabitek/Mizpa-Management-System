@@ -14,6 +14,7 @@ export interface RegisterAttendanceInput {
   matchId: string;
   playerId: string;
   guestName?: string;
+  guestType?: 'PLAYER' | 'COMPANION';
   hasVehicle?: boolean;
   vehiclePlate?: string;
   registeredAt?: Date;
@@ -42,7 +43,7 @@ export class RegisterAttendanceUseCase {
   }
 
   async execute(input: RegisterAttendanceInput): Promise<RegisterAttendanceResult> {
-    const { matchId, playerId, guestName, registeredAt = new Date() } = input;
+    const { matchId, playerId, guestName, guestType, registeredAt = new Date() } = input;
 
     // 1. Validar que el partido exista
     const match = await this.matchRepository.findById(matchId);
@@ -61,6 +62,11 @@ export class RegisterAttendanceUseCase {
     const currentAttendances = await this.attendanceRepository.findByMatchId(matchId);
 
     const isGuest = Boolean(guestName && guestName.trim().length > 0);
+    const resolvedGuestType: 'PLAYER' | 'COMPANION' | undefined = isGuest
+      ? guestType || 'PLAYER'
+      : undefined;
+
+    const isCompanion = resolvedGuestType === 'COMPANION';
 
     // 4. Chequeo de duplicados para auto-inscripción
     if (!isGuest) {
@@ -93,12 +99,12 @@ export class RegisterAttendanceUseCase {
       }
     }
 
-    // 5. Evaluar aforo disponible
-    const activeConfirmedCount = currentAttendances.filter(
-      (a) => a.status === 'CONFIRMED' || a.status === 'ATTENDED'
+    // 5. Evaluar aforo disponible: SOLO los jugadores (no acompañantes) consumen cupos de cancha
+    const activeConfirmedPlayersCount = currentAttendances.filter(
+      (a) => (a.status === 'CONFIRMED' || a.status === 'ATTENDED') && a.guestType !== 'COMPANION'
     ).length;
 
-    const hasSpotAvailable = activeConfirmedCount < match.maxPlayers;
+    const hasSpotAvailable = isCompanion ? true : activeConfirmedPlayersCount < match.maxPlayers;
     const status: AttendanceStatus = hasSpotAvailable ? 'CONFIRMED' : 'WAITLIST';
 
     // 6. Generar registro de asistencia
@@ -119,16 +125,21 @@ export class RegisterAttendanceUseCase {
       registeredAt,
       registeredByPlayerId: isGuest ? playerId : undefined,
       guestName: isGuest ? guestName!.trim() : undefined,
+      guestType: resolvedGuestType,
       hasVehicle: Boolean(input.hasVehicle),
       vehiclePlate: input.hasVehicle && input.vehiclePlate ? input.vehiclePlate.trim().toUpperCase() : undefined,
     };
 
     await this.attendanceRepository.save(newAttendance);
 
+    const finalPlayerCount = !isCompanion && hasSpotAvailable
+      ? activeConfirmedPlayersCount + 1
+      : activeConfirmedPlayersCount;
+
     return {
       attendance: newAttendance,
       isWaitlist: !hasSpotAvailable,
-      activeConfirmedCount: hasSpotAvailable ? activeConfirmedCount + 1 : activeConfirmedCount,
+      activeConfirmedCount: finalPlayerCount,
       maxPlayers: match.maxPlayers,
     };
   }

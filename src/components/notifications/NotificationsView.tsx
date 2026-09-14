@@ -154,9 +154,11 @@ export function NotificationsView({
       `📅 *Fecha:* ${formattedDate}\n` +
       `📍 *Cancha:* ${currentMatch.location}${currentMatch.locationAddress ? ` (${currentMatch.locationAddress})` : ''}\n` +
       `👥 *Cupos:* ${currentMatch.maxPlayers || 18} jugadores\n` +
-      `💵 *Cuota:* $${estFee.toLocaleString('es-CO')} COP\n` +
+      `💵 *Cuota proyectada:* $${estFee.toLocaleString('es-CO')} COP (con 18 cupos)\n` +
+      `💡 _Nota: La cuota final se divide en partes iguales entre los jugadores que asistan a la cancha._\n` +
       (mapsUrlToUse ? `🗺️ *Ubicación:* ${mapsUrlToUse}\n` : '') +
-      `\n👟 *Calzado:* Zapatillas para sintética (sin taches / cero guayos).\n\n` +
+      `\n👟 *Calzado:* Zapatillas para sintética (sin taches / cero guayos).\n` +
+      `👥 *Invitados:* Puedes registrar invitados jugadores (juegan cancha) o acompañantes/barra (no juegan y cuota cancha $0).\n\n` +
       `🔗 *Inscríbete aquí:*\n` +
       `👉 ${rsvpUrl}\n\n` +
       `⚠️ _Cupos por orden de llegada. Los siguientes pasan a lista de espera._`

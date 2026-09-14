@@ -56,10 +56,10 @@ export class SettleMatchUseCase {
       );
     }
 
-    // 3. Carga las asistencias del partido y filtra por status 'ATTENDED'.
+    // 3. Carga las asistencias del partido y filtra por jugadores con status 'ATTENDED' (excluye acompañantes que no juegan)
     const attendances = await this.attendanceRepository.findByMatchId(matchId);
     const attendees = attendances.filter(
-      (attendance) => attendance.status === 'ATTENDED'
+      (attendance) => attendance.status === 'ATTENDED' && attendance.guestType !== 'COMPANION'
     );
 
     // 4. Si no hay asistentes válidos, lanza InvalidAttendanceStateError.

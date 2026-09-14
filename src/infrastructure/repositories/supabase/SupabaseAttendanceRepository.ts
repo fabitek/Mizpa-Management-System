@@ -9,6 +9,7 @@ interface AttendanceRow {
   registered_at: string;
   registered_by_player_id?: string | null;
   guest_name?: string | null;
+  guest_type?: string | null;
   has_vehicle?: boolean | null;
   vehicle_plate?: string | null;
 }
@@ -43,6 +44,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
       registeredAt: new Date(row.registered_at),
       registeredByPlayerId: row.registered_by_player_id ?? undefined,
       guestName: row.guest_name ?? undefined,
+      guestType: (row.guest_type as 'PLAYER' | 'COMPANION') || (row.guest_name ? 'PLAYER' : undefined),
       hasVehicle: row.has_vehicle ?? undefined,
       vehiclePlate: row.vehicle_plate ?? undefined,
     };
@@ -59,6 +61,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
       registered_at: attendance.registeredAt.toISOString(),
       registered_by_player_id: optionalUUID(attendance.registeredByPlayerId),
       guest_name: attendance.guestName ?? null,
+      guest_type: attendance.guestType ?? (attendance.guestName ? 'PLAYER' : null),
       has_vehicle: attendance.hasVehicle ?? null,
       vehicle_plate: attendance.vehiclePlate ?? null,
     };

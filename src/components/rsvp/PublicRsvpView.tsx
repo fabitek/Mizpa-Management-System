@@ -81,6 +81,7 @@ export function PublicRsvpView({
   // Guest (+1) fields
   const [hasGuest, setHasGuest] = useState<boolean>(false);
   const [guestName, setGuestName] = useState<string>('');
+  const [guestType, setGuestType] = useState<'PLAYER' | 'COMPANION'>('PLAYER');
 
   // Google / Gmail Verification State
   const [gmailAddress, setGmailAddress] = useState<string>('');
@@ -97,9 +98,12 @@ export function PublicRsvpView({
   }, []);
 
   const confirmedList = attendances.filter(
-    (a) => a.status === 'CONFIRMED' || a.status === 'ATTENDED'
+    (a) => (a.status === 'CONFIRMED' || a.status === 'ATTENDED') && a.guestType !== 'COMPANION'
   );
-  const waitlistList = attendances.filter((a) => a.status === 'WAITLIST');
+  const companionList = attendances.filter(
+    (a) => (a.status === 'CONFIRMED' || a.status === 'ATTENDED') && a.guestType === 'COMPANION'
+  );
+  const waitlistList = attendances.filter((a) => a.status === 'WAITLIST' && a.guestType !== 'COMPANION');
   const maxPlayers = match.maxPlayers || 18;
   const isFull = confirmedList.length >= maxPlayers;
   const isRegistrationOpen = match.status === 'OPEN_REGISTRATION' || match.status === 'DRAFT';
@@ -110,7 +114,12 @@ export function PublicRsvpView({
   const parkingFee = durationHours * parkingFeePerHour;
 
   const estPitchFee = Math.ceil(match.pitchRentalCost / maxPlayers);
-  const totalEstimatedForUser = estPitchFee + (hasVehicle ? parkingFee : 0);
+  const confirmedPlayersCount = confirmedList.length;
+  const dynamicPitchFee = confirmedPlayersCount > 0 ? Math.ceil(match.pitchRentalCost / confirmedPlayersCount) : estPitchFee;
+  
+  // Total fee calculated for this user
+  const guestPitchFee = hasGuest && guestType === 'PLAYER' ? estPitchFee : 0;
+  const totalEstimatedForUser = estPitchFee + guestPitchFee + (hasVehicle ? parkingFee : 0);
 
   const getPlayer = (id: string) => players.find((p) => p.id === id);
 
@@ -274,7 +283,8 @@ export function PublicRsvpView({
           playerIdToUse,
           guestToRegister,
           hasVehicle,
-          plateToRegister
+          plateToRegister,
+          hasGuest ? guestType : undefined
         );
 
         setFeedback(res);
@@ -396,7 +406,7 @@ export function PublicRsvpView({
                     <span className="text-emerald-400 font-mono font-bold w-5">#{idx + 1}</span>
                     <div>
                       {att.guestName ? (
-                        <span className="font-semibold text-emerald-300">👥 {att.guestName} (+1)</span>
+                        <span className="font-semibold text-emerald-300">⚽ {att.guestName} (Invitado de {host?.fullName || 'Jugador'})</span>
                       ) : (
                         <span className="font-medium text-zinc-100">⚽ {host?.fullName || att.playerId}</span>
                       )}
@@ -412,6 +422,37 @@ export function PublicRsvpView({
               );
             })}
           </div>
+
+          {/* Companions / Spectators list */}
+          {companionList.length > 0 && (
+            <div className="pt-3 border-t border-zinc-800 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-400" />
+                <h3 className="text-xs font-bold text-blue-300">
+                  👥 Acompañantes / Barra ({companionList.length}) — No ocupan cupo
+                </h3>
+              </div>
+              <div className="divide-y divide-zinc-800/40 text-xs">
+                {companionList.map((att) => {
+                  const host = getPlayer(att.playerId);
+                  return (
+                    <div key={att.id} className="py-2 flex items-center justify-between text-zinc-300">
+                      <div className="flex items-center gap-2">
+                        <span className="text-blue-400 font-semibold">👥 {att.guestName || 'Acompañante'}</span>
+                        <span className="text-[11px] text-zinc-500">(con {host?.fullName || 'Jugador'})</span>
+                        {att.vehiclePlate && (
+                          <span className="font-mono text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded">
+                            🚗 {att.vehiclePlate}
+                          </span>
+                        )}
+                      </div>
+                      <Badge variant="info" className="text-[10px]">Acompañante</Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="text-center text-xs text-zinc-500 pt-2">
@@ -553,13 +594,46 @@ export function PublicRsvpView({
               </label>
 
               {hasGuest && (
-                <input
-                  type="text"
-                  placeholder="Nombre completo de tu invitado"
-                  value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-700 focus:border-emerald-500 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500"
-                />
+                <div className="space-y-3 bg-zinc-950/60 p-3.5 rounded-xl border border-zinc-800">
+                  <input
+                    type="text"
+                    placeholder="Nombre completo de tu invitado"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-700 focus:border-emerald-500 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500"
+                  />
+                  <div>
+                    <label className="text-[11px] font-semibold text-zinc-400 block mb-1.5">
+                      ¿Qué rol tendrá tu invitado?
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setGuestType('PLAYER')}
+                        className={`p-2.5 rounded-xl text-xs font-medium border text-left flex flex-col gap-0.5 transition-all ${
+                          guestType === 'PLAYER'
+                            ? 'bg-emerald-950/80 border-emerald-500 text-emerald-200'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                        }`}
+                      >
+                        <span className="font-bold flex items-center gap-1 text-emerald-300">⚽ Invitado Jugador</span>
+                        <span className="text-[10px] text-zinc-400">Juega fútbol, ocupa cupo en nómina (${estPitchFee.toLocaleString('es-CO')})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGuestType('COMPANION')}
+                        className={`p-2.5 rounded-xl text-xs font-medium border text-left flex flex-col gap-0.5 transition-all ${
+                          guestType === 'COMPANION'
+                            ? 'bg-blue-950/80 border-blue-500 text-blue-200'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                        }`}
+                      >
+                        <span className="font-bold flex items-center gap-1 text-blue-300">👥 Acompañante / Barra</span>
+                        <span className="text-[10px] text-zinc-400">No juega en cancha, cuota cancha $0</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
 
               <Button
@@ -865,18 +939,52 @@ export function PublicRsvpView({
                     </label>
 
                     {hasGuest && (
-                      <div className="pt-2 border-t border-zinc-800">
-                        <label className="text-xs text-blue-300 block mb-1 font-medium">
-                          Nombre completo del Invitado (+1):
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Ej: Camilo Andrés Rodríguez"
-                          value={guestName}
-                          onChange={(e) => setGuestName(e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        />
+                      <div className="pt-2 border-t border-zinc-800 space-y-3">
+                        <div>
+                          <label className="text-xs text-blue-300 block mb-1 font-medium">
+                            Nombre completo del Invitado (+1):
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ej: Camilo Andrés Rodríguez"
+                            value={guestName}
+                            onChange={(e) => setGuestName(e.target.value)}
+                            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-semibold text-zinc-400 block mb-1.5">
+                            ¿Tu invitado jugará en cancha o es acompañante?
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setGuestType('PLAYER')}
+                              className={`p-2.5 rounded-xl text-xs font-medium border text-left flex flex-col gap-1 transition-all ${
+                                guestType === 'PLAYER'
+                                  ? 'bg-emerald-950/80 border-emerald-500 text-emerald-200'
+                                  : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                              }`}
+                            >
+                              <span className="font-bold flex items-center gap-1 text-emerald-300">⚽ Invitado Jugador</span>
+                              <span className="text-[10px] text-zinc-400">Juega fútbol, ocupa cupo (${estPitchFee.toLocaleString('es-CO')})</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setGuestType('COMPANION')}
+                              className={`p-2.5 rounded-xl text-xs font-medium border text-left flex flex-col gap-1 transition-all ${
+                                guestType === 'COMPANION'
+                                  ? 'bg-blue-950/80 border-blue-500 text-blue-200'
+                                  : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                              }`}
+                            >
+                              <span className="font-bold flex items-center gap-1 text-blue-300">👥 Acompañante / Barra</span>
+                              <span className="text-[10px] text-zinc-400">No juega en cancha, cuota cancha $0</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -942,11 +1050,16 @@ export function PublicRsvpView({
                   {hasGuest && (
                     <div className="flex justify-between items-center text-zinc-300 border-b border-zinc-800 pb-2">
                       <span className="text-zinc-400">Invitado (+1):</span>
-                      <span className="text-blue-400 font-semibold">{guestName}</span>
+                      <span className={guestType === 'COMPANION' ? 'text-blue-400 font-semibold' : 'text-emerald-400 font-semibold'}>
+                        {guestName} ({guestType === 'COMPANION' ? 'Acompañante • Cuota Cancha $0' : 'Jugador • Cuota Cancha'})
+                      </span>
                     </div>
                   )}
                   <div className="flex justify-between items-center text-zinc-300 pt-1">
-                    <span className="text-zinc-400">Cuota Total Estimada:</span>
+                    <div>
+                      <span className="text-zinc-400 block">Cuota Total Estimada:</span>
+                      <span className="text-[10px] text-zinc-500">Base cupo 18: ${estPitchFee.toLocaleString('es-CO')} c/u</span>
+                    </div>
                     <span className="text-emerald-400 font-mono font-bold text-sm">
                       ${totalEstimatedForUser.toLocaleString('es-CO')} COP
                     </span>
