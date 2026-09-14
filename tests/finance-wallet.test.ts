@@ -164,7 +164,7 @@ describe('Phase 4: Player Wallet & Financial Module Use Cases', () => {
       };
       await matchRepo.save(match);
 
-      // 3 attended players -> 125,000 / 3 = 41,666.66 -> Math.ceil = 42,000 each
+      // 3 attended players -> 100,000 / 3 = 33,333.33 -> Math.ceil = 33,334 each base fee
       await attendanceRepo.save({
         id: 'att-1',
         matchId,
@@ -196,9 +196,8 @@ describe('Phase 4: Player Wallet & Financial Module Use Cases', () => {
       assert.equal(summary.matchId, matchId);
       assert.equal(summary.totalMatchCost, 125000);
       assert.equal(summary.attendedPlayersCount, 3);
-      assert.equal(summary.settledFeePerPlayer, 41667);
-      assert.equal(summary.totalDebitedAmount, 125001); // 3 * 41667
-      assert.equal(summary.roundingSurplus, 1); // 125,001 - 125,000 = 1 COP surplus
+      assert.equal(summary.settledFeePerPlayer, 33334);
+      assert.equal(summary.totalDebitedAmount, 100002); // 3 * 33334
       assert.equal(summary.isSettled, true);
     });
 

@@ -58,24 +58,19 @@ export class SendMatchConvocationUseCase {
       ? `🗺️ *Mapa / Cómo llegar:* ${match.googleMapsUrl}\n`
       : '';
 
-    const title = `⚽ Convocatoria Oficial: ${match.location}`;
+    const title = `⚽ Convocatoria Mizpa FC: ${match.location}`;
     const content =
-      `⚽ *¡CONVOCATORIA OFICIAL MIZPA FC!* ⚽\n\n` +
-      `🔗 *INSCRÍBETE AQUÍ (FORMULARIO OFICIAL):*\n` +
-      `👉 ${fullRsvpUrl}\n\n` +
-      `📍 *Cancha:* ${match.location}${match.locationAddress ? ` (${match.locationAddress})` : ''}\n` +
+      `⚽ *CONVOCATORIA • MIZPA FC* ⚽\n\n` +
+      `Convocatoria abierta. Confirma tu cupo en el link oficial:\n\n` +
       `📅 *Fecha:* ${formattedDate}\n` +
-      `👥 *Cupo:* ${match.maxPlayers} jugadores (¡por orden de llegada!)\n` +
-      `💵 *Cuota Estimada:* $${estFee.toLocaleString('es-CO')} COP\n` +
-      (mapsLine ? `${mapsLine}` : '') +
-      `\n📌 *Para tener en cuenta:*\n` +
-      `👟 *Calzado:* Únicamente tenis o zapatillas para cancha sintética (sin taches / cero guayos).\n` +
-      `🤝 *Ambiente:* Juego limpio, respeto y compañerismo.\n\n` +
-      `¿Cómo confirmar tu cupo?\n` +
-      `1️⃣ Haz clic en el enlace oficial de arriba:\n` +
-      `🔗 ${fullRsvpUrl}\n` +
-      `2️⃣ Selecciona tu nombre o regístrate con tu invitado (+1).\n\n` +
-      `⚠️ *Nota:* Al llenarse los ${match.maxPlayers} cupos titulares, los siguientes registros ingresarán automáticamente a Lista de Espera.`;
+      `📍 *Cancha:* ${match.location}${match.locationAddress ? ` (${match.locationAddress})` : ''}\n` +
+      `👥 *Cupos:* ${match.maxPlayers || 18} jugadores\n` +
+      `💵 *Cuota:* $${estFee.toLocaleString('es-CO')} COP\n` +
+      (mapsLine ? `🗺️ *Ubicación:* ${match.googleMapsUrl}\n` : '') +
+      `\n👟 *Calzado:* Zapatillas para sintética (sin taches / cero guayos).\n\n` +
+      `🔗 *Inscríbete aquí:*\n` +
+      `👉 ${fullRsvpUrl}\n\n` +
+      `⚠️ _Cupos por orden de llegada. Los siguientes pasan a lista de espera._`;
 
     return await this.notificationService.sendNotification({
       recipientPlayerId: dto.recipientPlayerId || 'GROUP',

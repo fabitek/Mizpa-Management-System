@@ -9,9 +9,9 @@ export class InMemoryAuthService implements IAuthService {
     this.players = players;
     // Default to the first player (Admin)
     const admin = players[0] ?? {
-      id: 'player-1',
-      fullName: 'Carlos Valderrama',
-      email: 'pibe@mizpa.com',
+      id: 'f0000000-0000-4000-8000-000000000001',
+      fullName: 'Fabián Téllez',
+      email: 'fabian.tellez@gmail.com',
       role: 'ADMIN',
       isActive: true,
       createdAt: new Date(),

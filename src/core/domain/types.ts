@@ -23,6 +23,8 @@ export interface Match {
   googleMapsUrl?: string;
   pitchRentalCost: number;
   extraCosts: number;
+  durationHours?: number;
+  parkingFeePerHour?: number;
   maxPlayers: number;
   settledFeePerPlayer: number | null;
   status: MatchStatus;
@@ -38,6 +40,7 @@ export interface Player {
   fullName: string;
   email: string;
   phone?: string;
+  documentId?: string; // Cédula o Documento de Identidad
   alias?: string;
   role?: UserRole;
   isActive: boolean;
@@ -52,6 +55,8 @@ export interface Attendance {
   registeredAt: Date;
   registeredByPlayerId?: string;
   guestName?: string;
+  hasVehicle?: boolean;
+  vehiclePlate?: string;
 }
 
 export interface FinancialEntry {

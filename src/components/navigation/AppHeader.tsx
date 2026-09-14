@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Badge } from '../ui/badge.tsx';
+import { Button } from '../ui/button.tsx';
 import { switchUserAction } from '../../app/actions/auth-actions.ts';
 import type { Player, UserRole } from '../../core/domain/types.ts';
 import {
@@ -15,7 +16,11 @@ import {
   Calendar,
   UserCheck,
   Crown,
+  LogOut,
+  Users,
 } from 'lucide-react';
+import { createClient } from '../../lib/supabase/client.ts';
+import { useRouter } from 'next/navigation';
 
 interface AppHeaderProps {
   players: Player[];
@@ -31,10 +36,27 @@ export function AppHeader({
   initialFullName,
 }: AppHeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
+
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>(initialPlayerId);
   const [currentRole, setCurrentRole] = useState<UserRole>(initialRole);
   const [currentName, setCurrentName] = useState<string>(initialFullName);
   const [isPending, startTransition] = useTransition();
+
+  // Completely hide header on public RSVP and login pages (AFTER declaring hooks)
+  if (pathname?.startsWith('/rsvp') || pathname === '/login') {
+    return null;
+  }
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch {
+      // Ignore
+    }
+    router.push('/login');
+  };
 
   const handleUserSwitch = (newPlayerId: string) => {
     setSelectedPlayerId(newPlayerId);
@@ -49,6 +71,7 @@ export function AppHeader({
 
   const navItems = [
     { href: '/matches', label: 'Partidos', icon: Calendar },
+    { href: '/players', label: 'Nómina', icon: Users },
     { href: '/wallet', label: 'Billetera', icon: Wallet },
     { href: '/stats', label: 'Estadísticas', icon: Trophy },
     { href: '/notifications', label: 'Notificaciones', icon: Bell },
@@ -124,16 +147,31 @@ export function AppHeader({
                 onChange={(e) => handleUserSwitch(e.target.value)}
                 disabled={isPending}
                 className="bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-                title="Cambiar usuario activo (Simulador RBAC)"
+                title="Cambiar usuario activo"
               >
-                {players.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.fullName} ({p.role || 'PLAYER'})
-                  </option>
-                ))}
+                {players.map((p) => {
+                  const label = p.role === 'ADMIN' || p.fullName.toLowerCase().includes('fabian')
+                    ? 'Fabián Téllez (Admin)'
+                    : p.alias ? `${p.fullName} (${p.alias})` : p.fullName;
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {label}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            className="text-zinc-400 hover:text-red-400 hover:bg-red-950/30 p-2 h-9 w-9 rounded-lg"
+            title="Cerrar Sesión"
+          >
+            <LogOut className="w-4 h-4" />
+          </Button>
         </div>
       </div>
     </header>

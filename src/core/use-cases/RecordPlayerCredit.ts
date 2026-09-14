@@ -35,9 +35,14 @@ export class RecordPlayerCreditUseCase {
       );
     }
 
-    const entryId = this.idGenerator
-      ? this.idGenerator()
-      : `credit-${playerId}-${Date.now()}`;
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    let entryId = crypto.randomUUID();
+    if (this.idGenerator) {
+      const gen = this.idGenerator();
+      if (UUID_REGEX.test(gen)) {
+        entryId = gen;
+      }
+    }
 
     const entry: FinancialEntry = {
       id: entryId,

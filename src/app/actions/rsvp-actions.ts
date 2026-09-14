@@ -6,6 +6,8 @@ import {
   cancelAttendanceUseCase,
   checkinAttendanceUseCase,
   openMatchRegistrationUseCase,
+  createPlayerUseCase,
+  playerRepository,
 } from '../../infrastructure/container.ts';
 import {
   MatchNotFoundError,
@@ -13,6 +15,7 @@ import {
   PlayerAlreadyRegisteredError,
   MatchAlreadySettledError,
   InvalidAttendanceStateError,
+  Player,
 } from '../../core/domain/index.ts';
 
 export interface ActionResult<T = unknown> {
@@ -22,24 +25,55 @@ export interface ActionResult<T = unknown> {
   errorCode?: string;
 }
 
+export async function createPlayerAction(input: {
+  fullName: string;
+  documentId: string;
+  phone: string;
+  alias?: string;
+  email?: string;
+}): Promise<ActionResult<Player>> {
+  try {
+    const player = await createPlayerUseCase.execute(input);
+    revalidatePath('/matches');
+    revalidatePath('/wallet');
+    return {
+      success: true,
+      message: `Jugador ${player.fullName} registrado correctamente.`,
+      data: player,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al registrar jugador.',
+      errorCode: 'CREATE_PLAYER_ERROR',
+    };
+  }
+}
+
 export async function registerAttendanceAction(
   matchId: string,
   playerId: string,
-  guestName?: string
+  guestName?: string,
+  hasVehicle?: boolean,
+  vehiclePlate?: string
 ): Promise<ActionResult> {
   try {
     const result = await registerAttendanceUseCase.execute({
       matchId,
       playerId,
       guestName,
+      hasVehicle,
+      vehiclePlate,
     });
 
     revalidatePath('/matches');
+    revalidatePath(`/rsvp/${matchId}`);
 
     const displayName = guestName ? `Invitado (+1: ${guestName})` : 'Jugador';
+    const vehicleMsg = hasVehicle && vehiclePlate ? ` (Vehículo: ${vehiclePlate.toUpperCase()})` : '';
     const statusMsg = result.isWaitlist
-      ? `${displayName} ingresó en LISTA DE ESPERA (Cupo lleno).`
-      : `${displayName} CONFIRMADO en cancha (${result.activeConfirmedCount}/${result.maxPlayers}).`;
+      ? `${displayName}${vehicleMsg} ingresó en LISTA DE ESPERA (Cupo lleno).`
+      : `${displayName}${vehicleMsg} CONFIRMADO en cancha (${result.activeConfirmedCount}/${result.maxPlayers}).`;
 
     return {
       success: true,

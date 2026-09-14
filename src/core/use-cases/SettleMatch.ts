@@ -69,27 +69,39 @@ export class SettleMatchUseCase {
       );
     }
 
-    // 5. Calcula la cuota final por asistente con Math.ceil((pitchRentalCost + extraCosts) / asistentes.length).
-    const totalCost = match.pitchRentalCost + match.extraCosts;
-    const feePerPlayer = calculateMatchFee(totalCost, attendees.length);
+    // 5. Calcula la cuota base de la cancha por asistente (Costo de cancha / total de asistentes)
+    const baseFeePerPlayer = calculateMatchFee(match.pitchRentalCost, attendees.length);
+    const durationHours = match.durationHours ?? 2;
+    const parkingFeePerHour = match.parkingFeePerHour ?? 1000;
+    const vehicleParkingFee = durationHours * parkingFeePerHour;
 
-    // 6. Genera un FinancialEntry tipo 'DEBIT' para cada jugador asistente por el valor liquidado.
+    // 6. Genera un FinancialEntry tipo 'DEBIT' para cada jugador asistente aplicando recargo de parqueadero solo si lleva vehículo
     const entries: FinancialEntry[] = attendees.map((attendee, index) => {
-      const entryId = this.idGenerator
-        ? this.idGenerator()
-        : `entry-${match.id}-${attendee.playerId}-${Date.now()}-${index}`;
+      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      let entryId = crypto.randomUUID();
+      if (this.idGenerator) {
+        const gen = this.idGenerator();
+        if (UUID_REGEX.test(gen)) {
+          entryId = gen;
+        }
+      }
 
       const targetPlayerId = attendee.registeredByPlayerId ?? attendee.playerId;
-      const note = attendee.guestName
-        ? `Liquidación de partido ${match.id} (Invitado +1: ${attendee.guestName})`
-        : `Liquidación de partido ${match.id} (${match.location})`;
+      const isVehicleDriver = !!(attendee.hasVehicle || attendee.vehiclePlate);
+      const feeForThisPlayer = baseFeePerPlayer + (isVehicleDriver ? vehicleParkingFee : 0);
+
+      const guestPrefix = attendee.guestName ? ` (Invitado +1: ${attendee.guestName})` : '';
+      const vehicleSuffix = isVehicleDriver
+        ? ` + Parqueadero ${durationHours}h ($${vehicleParkingFee.toLocaleString('es-CO')} COP)`
+        : '';
+      const note = `Liquidación partido ${match.location}${guestPrefix} - Cancha ($${baseFeePerPlayer.toLocaleString('es-CO')} COP)${vehicleSuffix}`;
 
       return {
         id: entryId,
         playerId: targetPlayerId,
         matchId: match.id,
         type: 'DEBIT',
-        amount: feePerPlayer,
+        amount: feeForThisPlayer,
         referenceDate,
         note,
         createdAt: new Date(),
@@ -99,11 +111,11 @@ export class SettleMatchUseCase {
     // 7. Persiste los débitos vía recordBatchEntries.
     await this.financeRepository.recordBatchEntries(entries);
 
-    // 8. Actualiza el partido: status = 'SETTLED', settledFeePerPlayer = cuota, updatedAt = new Date().
+    // 8. Actualiza el partido: status = 'SETTLED', settledFeePerPlayer = cuota base, updatedAt = new Date().
     const updatedMatch: Match = {
       ...match,
       status: 'SETTLED',
-      settledFeePerPlayer: feePerPlayer,
+      settledFeePerPlayer: baseFeePerPlayer,
       updatedAt: new Date(),
     };
 
@@ -113,7 +125,7 @@ export class SettleMatchUseCase {
     // 10. Retorna el partido liquidado y el monto asignado.
     return {
       match: updatedMatch,
-      settledFeePerPlayer: feePerPlayer,
+      settledFeePerPlayer: baseFeePerPlayer,
       entries,
     };
   }

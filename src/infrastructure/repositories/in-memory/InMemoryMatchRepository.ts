@@ -6,7 +6,7 @@ export class InMemoryMatchRepository implements IMatchRepository {
 
   constructor(initialMatches: Match[] = []) {
     const db = loadDB();
-    if (db && db.matches && db.matches.length > 0) {
+    if (db && Array.isArray(db.matches)) {
       this.matches = new Map(db.matches.map((m) => [m.id, { ...m }]));
     } else {
       this.matches = new Map(initialMatches.map((m) => [m.id, { ...m }]));
@@ -33,6 +33,11 @@ export class InMemoryMatchRepository implements IMatchRepository {
       throw new Error(`Match with ID '${match.id}' not found in repository.`);
     }
     this.matches.set(match.id, { ...match });
+    this.persist();
+  }
+
+  async delete(id: string): Promise<void> {
+    this.matches.delete(id);
     this.persist();
   }
 

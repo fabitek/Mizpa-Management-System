@@ -6,7 +6,7 @@ export class InMemoryAttendanceRepository implements IAttendanceRepository {
 
   constructor(initialAttendances: Attendance[] = []) {
     const db = loadDB();
-    if (db && db.attendances && db.attendances.length > 0) {
+    if (db && Array.isArray(db.attendances)) {
       this.attendances = db.attendances.map((a) => ({ ...a }));
     } else {
       this.attendances = initialAttendances.map((a) => ({ ...a }));
@@ -46,6 +46,16 @@ export class InMemoryAttendanceRepository implements IAttendanceRepository {
       throw new Error(`Attendance with ID '${attendance.id}' not found.`);
     }
     this.attendances[index] = { ...attendance };
+    this.persist();
+  }
+
+  async delete(id: string): Promise<void> {
+    this.attendances = this.attendances.filter((a) => a.id !== id);
+    this.persist();
+  }
+
+  async deleteByMatchId(matchId: string): Promise<void> {
+    this.attendances = this.attendances.filter((a) => a.matchId !== matchId);
     this.persist();
   }
 

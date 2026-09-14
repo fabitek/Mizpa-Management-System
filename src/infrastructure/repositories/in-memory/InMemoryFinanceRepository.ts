@@ -6,7 +6,7 @@ export class InMemoryFinanceRepository implements IFinanceRepository {
 
   constructor(initialEntries: FinancialEntry[] = []) {
     const db = loadDB();
-    if (db && db.financialEntries && db.financialEntries.length > 0) {
+    if (db && Array.isArray(db.financialEntries)) {
       this.entries = db.financialEntries.map((e) => ({ ...e }));
     } else {
       this.entries = initialEntries.map((e) => ({ ...e }));

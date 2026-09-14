@@ -6,7 +6,7 @@ export class InMemoryGoalRepository implements IGoalRepository {
 
   constructor(initialGoals: GoalEvent[] = []) {
     const db = loadDB();
-    if (db && db.goals && db.goals.length > 0) {
+    if (db && Array.isArray(db.goals)) {
       this.goals = db.goals.map((g) => ({ ...g }));
     } else {
       this.goals = initialGoals.map((g) => ({ ...g }));

@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import {
   settleMatchUseCase,
   createMatchUseCase,
+  updateMatchUseCase,
+  deleteMatchUseCase,
   openMatchRegistrationUseCase,
   matchRepository,
 } from '../../infrastructure/container.ts';
@@ -12,6 +14,7 @@ import {
   InvalidAttendanceStateError,
   InvalidFinancialAmountError,
   type Match,
+  type MatchStatus,
 } from '../../core/domain/index.ts';
 
 export interface SettleMatchActionResult {
@@ -97,7 +100,9 @@ export async function createMatchAction(input: {
   googleMapsUrl?: string;
   date: string;
   pitchRentalCost: number;
-  extraCosts: number;
+  extraCosts?: number;
+  durationHours?: number;
+  parkingFeePerHour?: number;
   maxPlayers?: number;
   openImmediately?: boolean;
 }): Promise<CreateMatchActionResult> {
@@ -118,6 +123,8 @@ export async function createMatchAction(input: {
       date: parsedDate,
       pitchRentalCost: Number(input.pitchRentalCost) || 0,
       extraCosts: Number(input.extraCosts) || 0,
+      durationHours: Number(input.durationHours) || 2,
+      parkingFeePerHour: Number(input.parkingFeePerHour) ?? 1000,
       maxPlayers: Number(input.maxPlayers) || 18,
       openImmediately: input.openImmediately ?? true,
     });
@@ -172,6 +179,83 @@ export async function openMatchRegistrationAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Error al abrir inscripciones.',
+    };
+  }
+}
+
+export async function updateMatchAction(input: {
+  id: string;
+  location?: string;
+  locationAddress?: string;
+  googleMapsUrl?: string;
+  date?: string;
+  pitchRentalCost?: number;
+  extraCosts?: number;
+  durationHours?: number;
+  parkingFeePerHour?: number;
+  maxPlayers?: number;
+  status?: MatchStatus;
+}): Promise<{ success: boolean; message: string; data?: Match }> {
+  try {
+    let parsedDate: Date | undefined;
+    if (input.date) {
+      parsedDate = new Date(input.date);
+      if (isNaN(parsedDate.getTime())) {
+        return {
+          success: false,
+          message: 'Fecha no válida.',
+        };
+      }
+    }
+
+    const updated = await updateMatchUseCase.execute({
+      id: input.id,
+      location: input.location,
+      locationAddress: input.locationAddress,
+      googleMapsUrl: input.googleMapsUrl,
+      date: parsedDate,
+      pitchRentalCost: input.pitchRentalCost,
+      extraCosts: input.extraCosts,
+      durationHours: input.durationHours,
+      parkingFeePerHour: input.parkingFeePerHour,
+      maxPlayers: input.maxPlayers,
+      status: input.status,
+    });
+
+    revalidatePath('/matches');
+    revalidatePath('/notifications');
+    revalidatePath(`/rsvp/${input.id}`);
+
+    return {
+      success: true,
+      message: `Convocatoria en ${updated.location} actualizada correctamente.`,
+      data: updated,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al actualizar la convocatoria.',
+    };
+  }
+}
+
+export async function deleteMatchAction(
+  matchId: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    await deleteMatchUseCase.execute({ matchId });
+
+    revalidatePath('/matches');
+    revalidatePath('/notifications');
+
+    return {
+      success: true,
+      message: 'Convocatoria eliminada correctamente.',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al eliminar la convocatoria.',
     };
   }
 }

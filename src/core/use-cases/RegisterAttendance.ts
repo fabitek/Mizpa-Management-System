@@ -14,6 +14,8 @@ export interface RegisterAttendanceInput {
   matchId: string;
   playerId: string;
   guestName?: string;
+  hasVehicle?: boolean;
+  vehiclePlate?: string;
   registeredAt?: Date;
 }
 
@@ -100,9 +102,14 @@ export class RegisterAttendanceUseCase {
     const status: AttendanceStatus = hasSpotAvailable ? 'CONFIRMED' : 'WAITLIST';
 
     // 6. Generar registro de asistencia
-    const attendanceId = this.idGenerator
-      ? this.idGenerator()
-      : `att-${matchId}-${isGuest ? 'guest' : playerId}-${Date.now()}`;
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    let attendanceId = crypto.randomUUID();
+    if (this.idGenerator) {
+      const gen = this.idGenerator();
+      if (UUID_REGEX.test(gen)) {
+        attendanceId = gen;
+      }
+    }
 
     const newAttendance: Attendance = {
       id: attendanceId,
@@ -112,6 +119,8 @@ export class RegisterAttendanceUseCase {
       registeredAt,
       registeredByPlayerId: isGuest ? playerId : undefined,
       guestName: isGuest ? guestName!.trim() : undefined,
+      hasVehicle: Boolean(input.hasVehicle),
+      vehiclePlate: input.hasVehicle && input.vehiclePlate ? input.vehiclePlate.trim().toUpperCase() : undefined,
     };
 
     await this.attendanceRepository.save(newAttendance);

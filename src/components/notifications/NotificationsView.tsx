@@ -13,6 +13,7 @@ import {
   sendDebtReminderAction,
   getNotificationsLogAction,
 } from '../../app/actions/notification-actions.ts';
+import { deleteMatchAction } from '../../app/actions/match-actions.ts';
 import type { Player, Match, NotificationMessage } from '../../core/domain/types.ts';
 import {
   Bell,
@@ -30,21 +31,55 @@ import {
   Users,
   Link as LinkIcon,
   Sparkles,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 
 interface NotificationsViewProps {
   players: Player[];
-  activeMatch: Match;
+  matches?: Match[];
+  activeMatch: Match | null;
   initialNotifications: NotificationMessage[];
 }
 
 export function NotificationsView({
   players,
+  matches,
   activeMatch,
   initialNotifications,
 }: NotificationsViewProps) {
   const [activeTab, setActiveTab] = useState<'group-convocation' | 'direct' | 'history'>('group-convocation');
   const [notifications, setNotifications] = useState<NotificationMessage[]>(initialNotifications);
+
+  const [matchList, setMatchList] = useState<Match[]>(
+    matches && matches.length > 0 ? matches : activeMatch ? [activeMatch] : []
+  );
+
+  // Selected Match for convocation
+  const [selectedMatchId, setSelectedMatchId] = useState<string>(
+    activeMatch?.id || matches?.[0]?.id || ''
+  );
+  const [showDeleteMatchDialog, setShowDeleteMatchDialog] = useState<boolean>(false);
+
+  const currentMatch =
+    matchList.find((m) => m.id === selectedMatchId) ||
+    matchList[0] ||
+    null;
+
+  const handleDeleteCurrentMatch = () => {
+    if (!currentMatch) return;
+    startTransition(async () => {
+      const idToDelete = currentMatch.id;
+      const res = await deleteMatchAction(idToDelete);
+      setFeedback(res);
+      if (res.success) {
+        const remaining = matchList.filter((m) => m.id !== idToDelete);
+        setMatchList(remaining);
+        setSelectedMatchId(remaining.length > 0 ? remaining[0].id : '');
+        setShowDeleteMatchDialog(false);
+      }
+    });
+  };
 
   // 1-to-1 form state
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>(players[0]?.id ?? '');
@@ -73,106 +108,134 @@ export function NotificationsView({
     }
   }, []);
 
-  // Official Web app URL for the RSVP registration form (WhatsApp link)
-  const baseDomain = process.env.NEXT_PUBLIC_SITE_URL || 'https://mizpa-fc.vercel.app';
-  const rsvpUrl = `${baseDomain.replace(/\/+$/, '')}/rsvp/${activeMatch.id}`;
+  // Web app URL for the RSVP registration form (uses current browser domain/port automatically)
+  const baseDomain =
+    origin ||
+    (typeof window !== 'undefined'
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_SITE_URL || 'https://mizpa-fc.vercel.app');
+  const rsvpUrl = currentMatch ? `${baseDomain.replace(/\/+$/, '')}/rsvp/${currentMatch.id}` : baseDomain;
 
-  const estFee = Math.ceil(
-    (activeMatch.pitchRentalCost + activeMatch.extraCosts) / (activeMatch.maxPlayers || 18)
-  );
+  const estFee = currentMatch
+    ? Math.ceil((currentMatch.pitchRentalCost + (currentMatch.extraCosts || 0)) / (currentMatch.maxPlayers || 18))
+    : 0;
 
-  const formattedDate = new Date(activeMatch.date).toLocaleString('es-CO', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const formattedDate = currentMatch
+    ? new Date(currentMatch.date).toLocaleString('es-CO', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '';
 
-  const cleanLocation = activeMatch.location.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
-  const cleanAddress = activeMatch.locationAddress ? activeMatch.locationAddress.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim() : '';
+  const cleanLocation = currentMatch
+    ? currentMatch.location.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim()
+    : '';
+  const cleanAddress = currentMatch?.locationAddress
+    ? currentMatch.locationAddress.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim()
+    : '';
   const fullLocQuery = cleanAddress ? `${cleanAddress} ${cleanLocation}`.trim() : cleanLocation;
 
-  const mapsUrlToUse =
-    activeMatch.googleMapsUrl && !activeMatch.googleMapsUrl.includes('%E2%9A%BD')
-      ? activeMatch.googleMapsUrl
-      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullLocQuery || activeMatch.location)}`;
+  const mapsUrlToUse = currentMatch
+    ? currentMatch.googleMapsUrl && !currentMatch.googleMapsUrl.includes('%E2%9A%BD')
+      ? currentMatch.googleMapsUrl
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullLocQuery || currentMatch.location)}`
+    : '';
 
-  // Single official WhatsApp Group convocation message
-  const groupConvocationText =
-    `⚽ *¡CONVOCATORIA OFICIAL MIZPA FC!* ⚽\n\n` +
-    `🔗 *INSCRÍBETE AQUÍ (FORMULARIO OFICIAL):*\n` +
-    `👉 ${rsvpUrl}\n\n` +
-    `📍 *Cancha:* ${activeMatch.location}${activeMatch.locationAddress ? ` (${activeMatch.locationAddress})` : ''}\n` +
-    `📅 *Fecha:* ${formattedDate}\n` +
-    `👥 *Cupo:* ${activeMatch.maxPlayers} jugadores (¡por orden de llegada!)\n` +
-    `💵 *Cuota Estimada:* $${estFee.toLocaleString('es-CO')} COP\n` +
-    (mapsUrlToUse ? `🗺️ *Mapa / Cómo llegar:* ${mapsUrlToUse}\n` : '') +
-    `\n📌 *Para tener en cuenta:*\n` +
-    `👟 *Calzado:* Únicamente tenis o zapatillas para cancha sintética (sin taches / cero guayos).\n` +
-    `🤝 *Ambiente:* Juego limpio, respeto y compañerismo.\n\n` +
-    `¿Cómo confirmar tu cupo?\n` +
-    `1️⃣ Haz clic en el enlace oficial de arriba:\n` +
-    `🔗 ${rsvpUrl}\n` +
-    `2️⃣ Selecciona tu nombre o regístrate con tu invitado (+1).\n\n` +
-    `⚠️ *Nota:* Al llenarse los ${activeMatch.maxPlayers} cupos titulares, los siguientes registros ingresarán automáticamente a Lista de Espera.`;
+  // Single official WhatsApp Group convocation message in authentic professional football tone
+  const groupConvocationText = currentMatch
+    ? `⚽ *CONVOCATORIA • MIZPA FC* ⚽\n\n` +
+      `Convocatoria abierta. Confirma tu cupo en el link oficial:\n\n` +
+      `📅 *Fecha:* ${formattedDate}\n` +
+      `📍 *Cancha:* ${currentMatch.location}${currentMatch.locationAddress ? ` (${currentMatch.locationAddress})` : ''}\n` +
+      `👥 *Cupos:* ${currentMatch.maxPlayers || 18} jugadores\n` +
+      `💵 *Cuota:* $${estFee.toLocaleString('es-CO')} COP\n` +
+      (mapsUrlToUse ? `🗺️ *Ubicación:* ${mapsUrlToUse}\n` : '') +
+      `\n👟 *Calzado:* Zapatillas para sintética (sin taches / cero guayos).\n\n` +
+      `🔗 *Inscríbete aquí:*\n` +
+      `👉 ${rsvpUrl}\n\n` +
+      `⚠️ _Cupos por orden de llegada. Los siguientes pasan a lista de espera._`
+    : '';
 
-  const feeSettledText =
-    `💰 *LIQUIDACIÓN DE CUOTA - MIZPA FC*\n\n` +
-    `📍 *Cancha:* ${activeMatch.location}\n` +
-    `💵 *Tu Cuota Congelada:* $${(activeMatch.settledFeePerPlayer || estFee).toLocaleString('es-CO')} COP\n\n` +
-    `💳 Realiza tu abono mediante Nequi o Daviplata y registra el comprobante en tu billetera.`;
+  const feeSettledText = currentMatch
+    ? `💰 *LIQUIDACIÓN DE CUOTA • MIZPA FC* ⚽\n\n` +
+      `Partido liquidado en *${currentMatch.location}*.\n\n` +
+      `💵 *Cuota asignada:* $${(currentMatch.settledFeePerPlayer || estFee).toLocaleString('es-CO')} COP\n` +
+      `💳 Realiza tu transferencia (Nequi / Daviplata) y sube tu comprobante a la billetera.`
+    : '';
 
-  const debtReminderText =
-    `⚠️ *RECORDATORIO DE CUOTA PENDIENTE - MIZPA FC*\n\n` +
-    `Hola ${selectedPlayer.fullName}! Te recordamos que tienes una cuota pendiente por tus últimos partidos jugados.\n\n` +
-    `Por favor realiza tu abono para mantener tu estado solvente y asegurar tus próximos cupos. ¡Gracias!`;
+  const debtReminderText = selectedPlayer
+    ? `⚠️ *RECORDATORIO DE PAGO • MIZPA FC* ⚽\n\n` +
+      `Hola ${selectedPlayer.fullName}, te recordamos realizar tu pago pendiente de partidos anteriores para mantener tu cupo activo.`
+    : '';
 
   const handleShareGroupWhatsApp = () => {
-    startTransition(async () => {
-      // 1. Register in notifications log
-      const res = await sendMatchConvocationAction(activeMatch.id, 'GROUP', baseDomain);
-      if (res.success) {
-        const logRes = await getNotificationsLogAction();
-        if (logRes.success && logRes.data) {
-          setNotifications(logRes.data);
-        }
-      }
+    if (!currentMatch) {
+      setFeedback({ success: false, message: 'No hay un partido activo para convocar.' });
+      return;
+    }
+    // 1. Open WhatsApp immediately to avoid browser popup blockers
+    const encoded = encodeURIComponent(groupConvocationText);
+    const url = `https://api.whatsapp.com/send?text=${encoded}`;
+    window.open(url, '_blank');
+    setFeedback({
+      success: true,
+      message: '¡Convocatoria abierta en WhatsApp! Selecciona el grupo de tu equipo para enviarla.',
+    });
 
-      // 2. Open WhatsApp without phone parameter (opens chat/group chooser)
-      const encoded = encodeURIComponent(groupConvocationText);
-      const url = `https://api.whatsapp.com/send?text=${encoded}`;
-      window.open(url, '_blank');
-      setFeedback({
-        success: true,
-        message: '¡Convocatoria abierta en WhatsApp! Selecciona el grupo de tu equipo para enviarla.',
-      });
+    // 2. Register in notifications log in background
+    startTransition(async () => {
+      try {
+        const res = await sendMatchConvocationAction(currentMatch.id, 'GROUP', baseDomain);
+        if (res.success) {
+          const logRes = await getNotificationsLogAction();
+          if (logRes.success && logRes.data) {
+            setNotifications(logRes.data);
+          }
+        }
+      } catch (err) {
+        console.warn('Nota: Registro de auditoría completado localmente.', err);
+      }
     });
   };
 
   const handleSendSettlement = () => {
+    if (!currentMatch) {
+      setFeedback({ success: false, message: 'No hay un partido activo para liquidar.' });
+      return;
+    }
     startTransition(async () => {
-      const res = await sendSettlementAlertsAction(activeMatch.id);
-      setFeedback(res);
-      if (res.success) {
-        const logRes = await getNotificationsLogAction();
-        if (logRes.success && logRes.data) {
-          setNotifications(logRes.data);
+      try {
+        const res = await sendSettlementAlertsAction(currentMatch.id);
+        setFeedback(res);
+        if (res.success) {
+          const logRes = await getNotificationsLogAction();
+          if (logRes.success && logRes.data) {
+            setNotifications(logRes.data);
+          }
         }
+      } catch (err) {
+        setFeedback({ success: false, message: 'Error de conexión con el servidor al registrar liquidaciones.' });
       }
     });
   };
 
   const handleSendDebtReminder = () => {
     startTransition(async () => {
-      const res = await sendDebtReminderAction(selectedPlayerId);
-      setFeedback(res);
-      if (res.success) {
-        const logRes = await getNotificationsLogAction();
-        if (logRes.success && logRes.data) {
-          setNotifications(logRes.data);
+      try {
+        const res = await sendDebtReminderAction(selectedPlayerId);
+        setFeedback(res);
+        if (res.success) {
+          const logRes = await getNotificationsLogAction();
+          if (logRes.success && logRes.data) {
+            setNotifications(logRes.data);
+          }
         }
+      } catch (err) {
+        setFeedback({ success: false, message: 'Error de conexión con el servidor al enviar recordatorio.' });
       }
     });
   };
@@ -226,7 +289,7 @@ export function NotificationsView({
               <LinkIcon className="w-4 h-4 text-blue-400" /> Enlace Canónico Activo
             </CardDescription>
             <CardTitle className="text-base font-mono text-zinc-200 truncate">
-              /rsvp/{activeMatch.id}
+              {currentMatch ? `/rsvp/${currentMatch.id}` : 'Sin partido activo'}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-zinc-400">
@@ -317,6 +380,87 @@ export function NotificationsView({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Match Selector & Actions */}
+              {matchList && matchList.length > 0 && (
+                <div className="p-3 bg-zinc-950/60 rounded-xl border border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+                    <label className="text-xs text-emerald-400 font-semibold flex items-center gap-1.5 shrink-0">
+                      <Calendar className="w-4 h-4" /> Seleccionar Partido:
+                    </label>
+                    <select
+                      value={selectedMatchId}
+                      onChange={(e) => setSelectedMatchId(e.target.value)}
+                      className="w-full sm:w-auto bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                    >
+                      {matchList.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.location} — {new Date(m.date).toLocaleDateString('es-CO', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} ({m.status})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {currentMatch && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Link href="/matches">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs font-semibold border-amber-500/30 bg-amber-950/20 hover:bg-amber-900/40 text-amber-300 hover:text-amber-100 hover:border-amber-500/60 shadow-sm hover:shadow-amber-500/10 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 rounded-lg px-2.5 gap-1.5 group"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-200" />
+                          <span>Editar</span>
+                        </Button>
+                      </Link>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isPending || currentMatch.status === 'SETTLED'}
+                        onClick={() => setShowDeleteMatchDialog(true)}
+                        className="h-8 text-xs font-semibold border-rose-500/30 bg-rose-950/20 hover:bg-rose-900/40 text-rose-300 hover:text-rose-100 hover:border-rose-500/60 shadow-sm hover:shadow-rose-500/10 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 rounded-lg px-2.5 gap-1.5 group disabled:opacity-50 disabled:pointer-events-none"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400 group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-200" />
+                        <span>Eliminar</span>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Confirmation Dialog for Match Deletion in Notifications */}
+              {showDeleteMatchDialog && currentMatch && (
+                <div className="p-3 bg-red-950/40 border border-red-800/60 rounded-xl space-y-2 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-red-300 flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 text-red-400" /> ¿Seguro que deseas eliminar la convocatoria de {currentMatch.location}?
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">
+                    Se borrará el partido y sus registros de inscripción. Esta acción no se puede deshacer.
+                  </p>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowDeleteMatchDialog(false)}
+                      className="h-7 text-xs text-zinc-400 hover:text-white"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={handleDeleteCurrentMatch}
+                      className="h-7 text-xs bg-red-600 hover:bg-red-500 text-white font-bold gap-1"
+                    >
+                      {isPending ? 'Eliminando...' : '🗑️ Confirmar Eliminación'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Single Link Preview Box */}
               <div className="bg-zinc-950/80 p-4 rounded-xl border border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3 overflow-hidden">
@@ -328,7 +472,7 @@ export function NotificationsView({
                       Enlace Único de Registro (RSVP)
                     </span>
                     <span className="font-mono text-sm text-emerald-300 truncate block" suppressHydrationWarning>
-                      {mounted ? rsvpUrl : `/rsvp/${activeMatch.id}`}
+                      {mounted ? rsvpUrl : (currentMatch ? `/rsvp/${currentMatch.id}` : '')}
                     </span>
                   </div>
                 </div>
@@ -337,19 +481,22 @@ export function NotificationsView({
                     onClick={() => copyToClipboard(rsvpUrl, '¡Enlace de registro copiado!')}
                     variant="outline"
                     size="sm"
+                    disabled={!currentMatch}
                     className="border-zinc-700 text-xs gap-1.5"
                   >
                     <Copy className="w-3.5 h-3.5" /> Copiar Enlace
                   </Button>
-                  <Link href={`/rsvp/${activeMatch.id}`} target="_blank">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white gap-1.5"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" /> Abrir Formulario
-                    </Button>
-                  </Link>
+                  {currentMatch && (
+                    <Link href={`/rsvp/${currentMatch.id}`} target="_blank">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white gap-1.5"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" /> Abrir Formulario
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </div>
 
@@ -362,7 +509,7 @@ export function NotificationsView({
                   className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 text-xs sm:text-sm font-mono text-zinc-200 whitespace-pre-wrap leading-relaxed shadow-inner"
                   suppressHydrationWarning
                 >
-                  {groupConvocationText}
+                  {currentMatch ? groupConvocationText : '⚠️ No hay ningún partido activo en este momento. Crea un nuevo partido en la pestaña "Partidos" para generar la plantilla oficial de WhatsApp.'}
                 </div>
               </div>
 
@@ -370,7 +517,7 @@ export function NotificationsView({
               <div className="flex flex-wrap items-center gap-3 pt-2">
                 <Button
                   onClick={handleShareGroupWhatsApp}
-                  disabled={isPending}
+                  disabled={isPending || !currentMatch}
                   size="lg"
                   className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-2 text-sm shadow-lg shadow-emerald-900/30"
                 >
@@ -382,6 +529,7 @@ export function NotificationsView({
                   onClick={() => copyToClipboard(groupConvocationText, '¡Mensaje completo copiado para pegar en WhatsApp!')}
                   variant="outline"
                   size="lg"
+                  disabled={!currentMatch}
                   className="border-zinc-700 text-zinc-200 font-medium gap-2 text-sm"
                 >
                   <Copy className="w-4 h-4" /> Copiar Mensaje Completo

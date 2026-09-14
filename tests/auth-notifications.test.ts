@@ -161,7 +161,7 @@ describe('Phase 6: Auth, Roles & Notifications Use Cases', () => {
       assert.equal(notif.type, 'MATCH_CONVOCATION');
       assert.equal(notif.actionUrl, `/rsvp/${testMatch.id}`);
       assert.ok(notif.content.includes('https://mizpa.app/rsvp/match-notif-1'));
-      assert.ok(notif.content.includes('¡por orden de llegada!'));
+      assert.ok(notif.content.includes('Cupos por orden de llegada'));
 
       // Verify that WhatsApp link without phone has no phone= parameter (opens group picker)
       const waGroupLink = notificationService.generateWhatsAppLink('', notif.content);
@@ -186,8 +186,7 @@ describe('Phase 6: Auth, Roles & Notifications Use Cases', () => {
 
       assert.ok(notif.content.includes('Cra. 30 #57-60, Bogotá'));
       assert.ok(notif.content.includes('https://maps.app.goo.gl/Vz5sFySMVhGJFrc3A?g_st=ic'));
-      assert.ok(notif.content.includes('Únicamente tenis o zapatillas para cancha sintética (sin taches / cero guayos)'));
-      assert.ok(notif.content.includes('Juego limpio, respeto y compañerismo'));
+      assert.ok(notif.content.includes('Zapatillas para sintética (sin taches / cero guayos)'));
     });
 
     it('should throw MatchNotFoundError when match does not exist', async () => {

@@ -77,10 +77,19 @@ function createMockSupabaseClient(tableHandlers: Record<string, (builder: MockQu
 // Test Suites: Supabase Repositories (Adapters)
 // ==============================================================================
 
+const TEST_MATCH_ID_1 = '11111111-1111-4111-8111-111111111111';
+const TEST_MATCH_ID_2 = '22222222-2222-4222-8222-222222222222';
+const TEST_PLAYER_ID_1 = '33333333-3333-4333-8333-333333333333';
+const TEST_PLAYER_ID_2 = '44444444-4444-4444-8444-444444444444';
+const TEST_ATT_ID_1 = '55555555-5555-4555-8555-555555555555';
+const TEST_ATT_ID_2 = '66666666-6666-4666-8666-666666666666';
+const TEST_FIN_ID_1 = '77777777-7777-4777-8777-777777777777';
+const TEST_FIN_ID_2 = '88888888-8888-4888-8888-888888888888';
+
 describe('SupabaseMatchRepository Adapter', () => {
   it('should find match by id and correctly map snake_case to Domain entity', async () => {
     const rawRow = {
-      id: 'match-123',
+      id: TEST_MATCH_ID_1,
       date: '2026-09-20T20:00:00.000Z',
       location: 'Cancha La 10',
       pitch_rental_cost: '150000.00',
@@ -98,7 +107,7 @@ describe('SupabaseMatchRepository Adapter', () => {
         return {
           select: () => ({
             eq: (_col: string, val: string) => {
-              assert.equal(val, 'match-123');
+              assert.equal(val, TEST_MATCH_ID_1);
               return {
                 maybeSingle: async () => ({ data: rawRow, error: null }),
               };
@@ -109,10 +118,10 @@ describe('SupabaseMatchRepository Adapter', () => {
     } as unknown as SupabaseClient;
 
     const repo = new SupabaseMatchRepository(client);
-    const match = await repo.findById('match-123');
+    const match = await repo.findById(TEST_MATCH_ID_1);
 
     assert.ok(match);
-    assert.equal(match.id, 'match-123');
+    assert.equal(match.id, TEST_MATCH_ID_1);
     assert.equal(match.location, 'Cancha La 10');
     assert.equal(match.pitchRentalCost, 150000);
     assert.equal(match.extraCosts, 25000);
@@ -125,6 +134,7 @@ describe('SupabaseMatchRepository Adapter', () => {
   });
 
   it('should return null when match is not found', async () => {
+    const nonExistentId = '99999999-9999-4999-8999-999999999999';
     const client = {
       from: () => ({
         select: () => ({
@@ -136,7 +146,7 @@ describe('SupabaseMatchRepository Adapter', () => {
     } as unknown as SupabaseClient;
 
     const repo = new SupabaseMatchRepository(client);
-    const match = await repo.findById('non-existent');
+    const match = await repo.findById(nonExistentId);
     assert.equal(match, null);
   });
 
@@ -157,7 +167,7 @@ describe('SupabaseMatchRepository Adapter', () => {
 
     const repo = new SupabaseMatchRepository(client);
     const domainMatch: Match = {
-      id: 'match-new',
+      id: TEST_MATCH_ID_2,
       date: new Date('2026-09-25T18:00:00.000Z'),
       location: 'Cancha Campín 5',
       pitchRentalCost: 120000,
@@ -172,7 +182,7 @@ describe('SupabaseMatchRepository Adapter', () => {
     await repo.save(domainMatch);
 
     assert.ok(insertedRow);
-    assert.equal(insertedRow.id, 'match-new');
+    assert.equal(insertedRow.id, TEST_MATCH_ID_2);
     assert.equal(insertedRow.pitch_rental_cost, 120000);
     assert.equal(insertedRow.extra_costs, 20000);
     assert.equal(insertedRow.status, 'OPEN_REGISTRATION');
@@ -183,16 +193,16 @@ describe('SupabaseAttendanceRepository Adapter', () => {
   it('should find attendances by match id and map to domain entities', async () => {
     const rawRows = [
       {
-        id: 'att-1',
-        match_id: 'match-100',
-        player_id: 'player-1',
+        id: TEST_ATT_ID_1,
+        match_id: TEST_MATCH_ID_1,
+        player_id: TEST_PLAYER_ID_1,
         status: 'ATTENDED',
         registered_at: '2026-09-10T12:00:00.000Z',
       },
       {
-        id: 'att-2',
-        match_id: 'match-100',
-        player_id: 'player-2',
+        id: TEST_ATT_ID_2,
+        match_id: TEST_MATCH_ID_1,
+        player_id: TEST_PLAYER_ID_2,
         status: 'CONFIRMED',
         registered_at: '2026-09-10T12:05:00.000Z',
       },
@@ -204,7 +214,7 @@ describe('SupabaseAttendanceRepository Adapter', () => {
         return {
           select: () => ({
             eq: (_col: string, val: string) => {
-              assert.equal(val, 'match-100');
+              assert.equal(val, TEST_MATCH_ID_1);
               return Promise.resolve({ data: rawRows, error: null });
             },
           }),
@@ -213,12 +223,12 @@ describe('SupabaseAttendanceRepository Adapter', () => {
     } as unknown as SupabaseClient;
 
     const repo = new SupabaseAttendanceRepository(client);
-    const attendances = await repo.findByMatchId('match-100');
+    const attendances = await repo.findByMatchId(TEST_MATCH_ID_1);
 
     assert.equal(attendances.length, 2);
-    assert.equal(attendances[0].id, 'att-1');
+    assert.equal(attendances[0].id, TEST_ATT_ID_1);
     assert.equal(attendances[0].status, 'ATTENDED');
-    assert.equal(attendances[0].playerId, 'player-1');
+    assert.equal(attendances[0].playerId, TEST_PLAYER_ID_1);
     assert.ok(attendances[0].registeredAt instanceof Date);
     assert.equal(attendances[1].status, 'CONFIRMED');
   });
@@ -243,9 +253,9 @@ describe('SupabaseFinanceRepository Adapter', () => {
     const repo = new SupabaseFinanceRepository(client);
     const entries: FinancialEntry[] = [
       {
-        id: 'debit-1',
-        playerId: 'player-1',
-        matchId: 'match-100',
+        id: TEST_FIN_ID_1,
+        playerId: TEST_PLAYER_ID_1,
+        matchId: TEST_MATCH_ID_1,
         type: 'DEBIT',
         amount: 14000,
         referenceDate: new Date('2026-09-15T21:00:00.000Z'),
@@ -255,8 +265,8 @@ describe('SupabaseFinanceRepository Adapter', () => {
 
     await repo.recordBatchEntries(entries);
     assert.equal(insertedRows.length, 1);
-    assert.equal(insertedRows[0].id, 'debit-1');
-    assert.equal(insertedRows[0].player_id, 'player-1');
+    assert.equal(insertedRows[0].id, TEST_FIN_ID_1);
+    assert.equal(insertedRows[0].player_id, TEST_PLAYER_ID_1);
     assert.equal(insertedRows[0].type, 'DEBIT');
     assert.equal(insertedRows[0].amount, 14000);
   });
@@ -264,8 +274,8 @@ describe('SupabaseFinanceRepository Adapter', () => {
   it('should calculate player balance correctly from credit and debit entries', async () => {
     const rawRows = [
       {
-        id: 'entry-1',
-        player_id: 'player-1',
+        id: TEST_FIN_ID_1,
+        player_id: TEST_PLAYER_ID_1,
         match_id: null,
         type: 'CREDIT',
         amount: '50000.00',
@@ -275,9 +285,9 @@ describe('SupabaseFinanceRepository Adapter', () => {
         created_at: '2026-09-01T10:00:00.000Z',
       },
       {
-        id: 'entry-2',
-        player_id: 'player-1',
-        match_id: 'match-100',
+        id: TEST_FIN_ID_2,
+        player_id: TEST_PLAYER_ID_1,
+        match_id: TEST_MATCH_ID_1,
         type: 'DEBIT',
         amount: '14000.00',
         reference_date: '2026-09-15T21:00:00.000Z',
@@ -301,7 +311,7 @@ describe('SupabaseFinanceRepository Adapter', () => {
     } as unknown as SupabaseClient;
 
     const repo = new SupabaseFinanceRepository(client);
-    const balance = await repo.getPlayerBalance('player-1');
+    const balance = await repo.getPlayerBalance(TEST_PLAYER_ID_1);
 
     // 50000 CREDIT - 14000 DEBIT = 36000 balance
     assert.equal(balance, 36000);

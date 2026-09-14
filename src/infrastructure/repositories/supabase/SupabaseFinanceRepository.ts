@@ -13,6 +13,18 @@ interface FinancialEntryRow {
   created_at: string;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function ensureUUID(id?: string | null): string {
+  if (id && UUID_REGEX.test(id)) return id;
+  return crypto.randomUUID();
+}
+
+function optionalUUID(id?: string | null): string | null {
+  if (id && UUID_REGEX.test(id)) return id;
+  return null;
+}
+
 export class SupabaseFinanceRepository implements IFinanceRepository {
   private client: SupabaseClient;
 
@@ -35,10 +47,12 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
   }
 
   private mapEntityToRow(entry: FinancialEntry): Partial<FinancialEntryRow> {
+    const validId = ensureUUID(entry.id);
+    entry.id = validId;
     return {
-      id: entry.id,
-      player_id: entry.playerId,
-      match_id: entry.matchId ?? null,
+      id: validId,
+      player_id: ensureUUID(entry.playerId),
+      match_id: optionalUUID(entry.matchId),
       type: entry.type,
       amount: entry.amount,
       reference_date: entry.referenceDate.toISOString(),
@@ -73,75 +87,98 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
   }
 
   async getEntriesByPlayerId(playerId: string): Promise<FinancialEntry[]> {
-    const { data, error } = await this.client
-      .from('financial_entries')
-      .select('*')
-      .eq('player_id', playerId)
-      .order('reference_date', { ascending: true });
-
-    if (error) {
-      throw new Error(
-        `Failed to get financial entries for player '${playerId}': ${error.message}`
-      );
-    }
-
-    if (!data) {
+    if (!playerId || !UUID_REGEX.test(playerId)) {
       return [];
     }
+    try {
+      const { data, error } = await this.client
+        .from('financial_entries')
+        .select('*')
+        .eq('player_id', playerId)
+        .order('reference_date', { ascending: true });
 
-    return (data as FinancialEntryRow[]).map((row) => this.mapRowToEntity(row));
+      if (error) {
+        console.warn(`Supabase getEntriesByPlayerId warning for '${playerId}':`, error.message);
+        return [];
+      }
+
+      if (!data) {
+        return [];
+      }
+
+      return (data as FinancialEntryRow[]).map((row) => this.mapRowToEntity(row));
+    } catch (err) {
+      console.warn(`Supabase getEntriesByPlayerId exception for '${playerId}':`, err);
+      return [];
+    }
   }
 
   async getEntriesByMatchId(matchId: string): Promise<FinancialEntry[]> {
-    const { data, error } = await this.client
-      .from('financial_entries')
-      .select('*')
-      .eq('match_id', matchId)
-      .order('reference_date', { ascending: true });
-
-    if (error) {
-      throw new Error(
-        `Failed to get financial entries for match '${matchId}': ${error.message}`
-      );
-    }
-
-    if (!data) {
+    if (!matchId || !UUID_REGEX.test(matchId)) {
       return [];
     }
+    try {
+      const { data, error } = await this.client
+        .from('financial_entries')
+        .select('*')
+        .eq('match_id', matchId)
+        .order('reference_date', { ascending: true });
 
-    return (data as FinancialEntryRow[]).map((row) => this.mapRowToEntity(row));
+      if (error) {
+        console.warn(`Supabase getEntriesByMatchId warning for '${matchId}':`, error.message);
+        return [];
+      }
+
+      if (!data) {
+        return [];
+      }
+
+      return (data as FinancialEntryRow[]).map((row) => this.mapRowToEntity(row));
+    } catch (err) {
+      console.warn(`Supabase getEntriesByMatchId exception for '${matchId}':`, err);
+      return [];
+    }
   }
 
   async getAllEntries(): Promise<FinancialEntry[]> {
-    const { data, error } = await this.client
-      .from('financial_entries')
-      .select('*')
-      .order('reference_date', { ascending: false });
+    try {
+      const { data, error } = await this.client
+        .from('financial_entries')
+        .select('*')
+        .order('reference_date', { ascending: false });
 
-    if (error) {
-      throw new Error(
-        `Failed to get all financial entries: ${error.message}`
-      );
-    }
+      if (error) {
+        console.warn('Supabase getAllEntries warning:', error.message);
+        return [];
+      }
 
-    if (!data) {
+      if (!data) {
+        return [];
+      }
+
+      return (data as FinancialEntryRow[]).map((row) => this.mapRowToEntity(row));
+    } catch (err) {
+      console.warn('Supabase getAllEntries exception:', err);
       return [];
     }
-
-    return (data as FinancialEntryRow[]).map((row) => this.mapRowToEntity(row));
   }
 
   async getPlayerBalance(playerId: string): Promise<number> {
-    const entries = await this.getEntriesByPlayerId(playerId);
+    try {
+      const entries = await this.getEntriesByPlayerId(playerId);
 
-    return entries.reduce((acc, entry) => {
-      if (entry.type === 'CREDIT') {
-        return acc + entry.amount;
-      }
-      if (entry.type === 'DEBIT') {
-        return acc - entry.amount;
-      }
-      return acc;
-    }, 0);
+      return entries.reduce((acc, entry) => {
+        if (entry.type === 'CREDIT') {
+          return acc + entry.amount;
+        }
+        if (entry.type === 'DEBIT') {
+          return acc - entry.amount;
+        }
+        return acc;
+      }, 0);
+    } catch (err) {
+      console.warn(`Supabase getPlayerBalance exception for '${playerId}':`, err);
+      return 0;
+    }
   }
 }

@@ -1,10 +1,11 @@
 import fs from 'fs';
 import path from 'path';
-import { Match, Attendance, FinancialEntry, GoalEvent, NotificationMessage } from '../../../core/domain/types.ts';
+import type { Match, Player, Attendance, FinancialEntry, GoalEvent, NotificationMessage } from '../../../core/domain/types.ts';
 
 const DB_PATH = path.join(process.cwd(), '.mizpa-db.json');
 
 export interface DBState {
+  players: Player[];
   matches: Match[];
   attendances: Attendance[];
   financialEntries: FinancialEntry[];
@@ -13,10 +14,12 @@ export interface DBState {
 }
 
 export function loadDB(): DBState | null {
+  if (process.env.NODE_ENV === 'test' || process.argv.includes('--test')) {
+    return null;
+  }
   try {
     if (fs.existsSync(DB_PATH)) {
       const data = fs.readFileSync(DB_PATH, 'utf-8');
-      const parsed = JSON.parse(data);
       
       // Revive dates
       const reviveDate = (key: string, value: any) => {
@@ -35,8 +38,11 @@ export function loadDB(): DBState | null {
 }
 
 export function saveDB(state: Partial<DBState>) {
+  if (process.env.NODE_ENV === 'test' || process.argv.includes('--test')) {
+    return;
+  }
   try {
-    const current = loadDB() || { matches: [], attendances: [], financialEntries: [], goals: [], notifications: [] };
+    const current = loadDB() || { players: [], matches: [], attendances: [], financialEntries: [], goals: [], notifications: [] };
     const nextState = { ...current, ...state };
     fs.writeFileSync(DB_PATH, JSON.stringify(nextState, null, 2), 'utf-8');
   } catch (err) {

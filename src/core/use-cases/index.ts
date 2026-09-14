@@ -1,3 +1,4 @@
+export * from './CreatePlayer.ts';
 export * from './CalculateMatchFee.ts';
 export * from './SettleMatch.ts';
 export * from './CreateMatch.ts';
@@ -19,3 +20,5 @@ export * from './SendSettlementAlerts.ts';
 export * from './SendDebtReminder.ts';
 export * from './GetNotificationsLog.ts';
 export * from './SwitchSessionUser.ts';
+export * from './UpdateMatch.ts';
+export * from './DeleteMatch.ts';

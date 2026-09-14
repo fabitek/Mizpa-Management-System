@@ -35,7 +35,7 @@ import {
 
 interface LeaderboardViewProps {
   players: Player[];
-  activeMatch: Match;
+  activeMatch: Match | null;
   initialOverview: LeaderboardOverview;
   initialPlayerStats: PlayerPerformanceStats;
 }
@@ -57,7 +57,7 @@ export function LeaderboardView({
   const [goalType, setGoalType] = useState<GoalType>('OPEN_PLAY');
 
   // MVP selection state
-  const [mvpPlayerId, setMvpPlayerId] = useState<string>(activeMatch.mvpPlayerId || (players[0]?.id ?? ''));
+  const [mvpPlayerId, setMvpPlayerId] = useState<string>(activeMatch?.mvpPlayerId || (players[0]?.id ?? ''));
 
   const [feedback, setFeedback] = useState<{ success: boolean; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -76,6 +76,10 @@ export function LeaderboardView({
 
   const handleRecordGoal = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!activeMatch) {
+      setFeedback({ success: false, message: 'No hay un partido activo para registrar goles.' });
+      return;
+    }
     const minuteNum = goalMinute ? parseInt(goalMinute, 10) : undefined;
     if (minuteNum !== undefined && (isNaN(minuteNum) || minuteNum < 0 || minuteNum > 130)) {
       setFeedback({ success: false, message: 'El minuto debe estar entre 0 y 130.' });
@@ -106,6 +110,10 @@ export function LeaderboardView({
 
   const handleAssignMvp = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!activeMatch) {
+      setFeedback({ success: false, message: 'No hay un partido activo para asignar MVP.' });
+      return;
+    }
     startTransition(async () => {
       const res = await assignMatchMvpAction(activeMatch.id, mvpPlayerId);
       setFeedback(res);
@@ -618,7 +626,9 @@ export function LeaderboardView({
               <PlusCircle className="w-5 h-5 text-emerald-400" /> Registrar Gol en Partido Activo
             </CardTitle>
             <CardDescription className="text-xs">
-              Anota goles en tiempo real vinculados a {activeMatch.location} ({new Date(activeMatch.date).toLocaleDateString('es-CO')}).
+              {activeMatch
+                ? `Anota goles en tiempo real vinculados a ${activeMatch.location} (${new Date(activeMatch.date).toLocaleDateString('es-CO')}).`
+                : 'Crea o programa un partido para registrar goles en vivo.'}
             </CardDescription>
           </CardHeader>
           <CardContent>

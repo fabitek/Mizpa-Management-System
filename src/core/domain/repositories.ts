@@ -1,5 +1,6 @@
 import type {
   Match,
+  Player,
   Attendance,
   FinancialEntry,
   GoalEvent,
@@ -8,11 +9,20 @@ import type {
   NotificationMessage,
 } from './types.ts';
 
+export interface IPlayerRepository {
+  findById(id: string): Promise<Player | null>;
+  findByDocumentId(documentId: string): Promise<Player | null>;
+  findAll(): Promise<Player[]>;
+  save(player: Player): Promise<void>;
+  update(player: Player): Promise<void>;
+}
+
 export interface IMatchRepository {
   findById(id: string): Promise<Match | null>;
   findAll(): Promise<Match[]>;
   save(match: Match): Promise<void>;
   update(match: Match): Promise<void>;
+  delete(id: string): Promise<void>;
 }
 
 export interface IAttendanceRepository {
@@ -22,6 +32,8 @@ export interface IAttendanceRepository {
   findAll(): Promise<Attendance[]>;
   save(attendance: Attendance): Promise<void>;
   update(attendance: Attendance): Promise<void>;
+  delete(id: string): Promise<void>;
+  deleteByMatchId(matchId: string): Promise<void>;
 }
 
 export interface IFinanceRepository {

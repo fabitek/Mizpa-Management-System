@@ -230,19 +230,19 @@ describe('SettleMatch Use Case', () => {
       registeredAt: new Date('2026-09-02T10:20:00Z'),
     });
 
-    // 125 / 3 = 41.666... -> Math.ceil = 42
+    // 100 / 3 = 33.333... -> Math.ceil = 34
     const result = await settleMatch.execute({ matchId });
 
-    assert.equal(result.settledFeePerPlayer, 42);
+    assert.equal(result.settledFeePerPlayer, 34);
     assert.equal(result.match.status, 'SETTLED');
-    assert.equal(result.match.settledFeePerPlayer, 42);
+    assert.equal(result.match.settledFeePerPlayer, 34);
     assert.ok(result.match.updatedAt instanceof Date);
 
     // Verify repository update
     const updatedInDb = await matchRepo.findById(matchId);
     assert.ok(updatedInDb);
     assert.equal(updatedInDb.status, 'SETTLED');
-    assert.equal(updatedInDb.settledFeePerPlayer, 42);
+    assert.equal(updatedInDb.settledFeePerPlayer, 34);
 
     // Verify financial entries
     assert.equal(result.entries.length, 3);
@@ -251,13 +251,13 @@ describe('SettleMatch Use Case', () => {
     const player1Entries = await financeRepo.getEntriesByPlayerId('player-1');
     assert.equal(player1Entries.length, 1);
     assert.equal(player1Entries[0].type, 'DEBIT');
-    assert.equal(player1Entries[0].amount, 42);
+    assert.equal(player1Entries[0].amount, 34);
     assert.equal(player1Entries[0].matchId, matchId);
 
     const player2Entries = await financeRepo.getEntriesByPlayerId('player-2');
     assert.equal(player2Entries.length, 1);
     assert.equal(player2Entries[0].type, 'DEBIT');
-    assert.equal(player2Entries[0].amount, 42);
+    assert.equal(player2Entries[0].amount, 34);
 
     const player4Entries = await financeRepo.getEntriesByPlayerId('player-4');
     assert.equal(player4Entries.length, 0);

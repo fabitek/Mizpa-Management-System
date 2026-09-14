@@ -264,9 +264,9 @@ describe('Phase 3: Match Lifecycle & RSVP Use Cases', () => {
       status: 'ATTENDED',
     });
 
-    // Total 120000 / 2 attendees = 60000 each
+    // Total pitch cost 100000 / 2 attendees = 50000 base fee each
     const settleResult = await settleMatch.execute({ matchId: match.id });
-    assert.equal(settleResult.settledFeePerPlayer, 60000);
+    assert.equal(settleResult.settledFeePerPlayer, 50000);
     assert.equal(settleResult.entries.length, 2);
 
     // Both entries should be billed to player-host!
@@ -275,7 +275,7 @@ describe('Phase 3: Match Lifecycle & RSVP Use Cases', () => {
 
     // Check financial balance of player-host
     const balance = await financeRepo.getPlayerBalance('player-host');
-    // Balance is -120000 (two debits of 60000)
-    assert.equal(balance, -120000);
+    // Balance is -100000 (two debits of 50000)
+    assert.equal(balance, -100000);
   });
 });

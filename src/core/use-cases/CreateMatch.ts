@@ -7,7 +7,9 @@ export interface CreateMatchInput {
   locationAddress?: string;
   googleMapsUrl?: string;
   pitchRentalCost: number;
-  extraCosts: number;
+  extraCosts?: number;
+  durationHours?: number;
+  parkingFeePerHour?: number;
   maxPlayers: number;
   openImmediately?: boolean;
 }
@@ -31,7 +33,9 @@ export class CreateMatchUseCase {
       location,
       locationAddress,
       pitchRentalCost,
-      extraCosts,
+      extraCosts = 0,
+      durationHours = 2,
+      parkingFeePerHour = 1000,
       maxPlayers,
       openImmediately = false,
     } = input;
@@ -48,11 +52,16 @@ export class CreateMatchUseCase {
       throw new Error('Maximum players count must be greater than 0.');
     }
 
-    const matchId =
-      id ??
-      (this.idGenerator
-        ? this.idGenerator()
-        : `match-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`);
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    let matchId = crypto.randomUUID();
+    if (id && UUID_REGEX.test(id)) {
+      matchId = id;
+    } else if (this.idGenerator) {
+      const gen = this.idGenerator();
+      if (UUID_REGEX.test(gen)) {
+        matchId = gen;
+      }
+    }
 
     const status: MatchStatus = openImmediately ? 'OPEN_REGISTRATION' : 'DRAFT';
     const now = new Date();
@@ -79,6 +88,8 @@ export class CreateMatchUseCase {
       googleMapsUrl: computedGoogleMapsUrl,
       pitchRentalCost,
       extraCosts,
+      durationHours,
+      parkingFeePerHour,
       maxPlayers,
       settledFeePerPlayer: null,
       status,
