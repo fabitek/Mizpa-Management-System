@@ -33,6 +33,7 @@ import {
   getVehicleIcon,
 } from '../../core/utils/plate-formatter.ts';
 import { copyToClipboard } from '../../core/utils/clipboard.ts';
+import { MatchLiveStopwatch } from './MatchLiveStopwatch.tsx';
 import {
   Calendar,
   MapPin,
@@ -137,6 +138,9 @@ export function MatchSettlementCard({
   const [cashModalPlayer, setCashModalPlayer] = useState<{ id: string; name: string; suggestedAmount: number } | null>(null);
   const [cashAmount, setCashAmount] = useState<number>(10000);
   const [cashNote, setCashNote] = useState<string>('');
+
+  // Minimalist active tab navigation
+  const [activeTab, setActiveTab] = useState<'roster' | 'live' | 'finances' | 'share'>('roster');
 
   const isSettled = match ? match.status === 'SETTLED' : false;
   const durationHours = match?.durationHours ?? 2;
@@ -1349,527 +1353,494 @@ export function MatchSettlementCard({
         </Card>
       ) : (
         <>
-          {/* Metric Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {/* Cost Breakdown */}
-            <Card className="border-zinc-800 bg-zinc-900/60 shadow-md">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-zinc-400 flex items-center gap-1.5 text-xs">
-                  <DollarSign className="w-4 h-4 text-emerald-400" /> Alquiler de Cancha
-                </CardDescription>
-                <CardTitle className="text-2xl font-mono text-white">
-                  ${match.pitchRentalCost.toLocaleString('es-CO')} COP
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-xs text-zinc-400 space-y-1">
-                <div className="flex justify-between py-1 border-b border-zinc-800">
-                  <span>Duración del Partido:</span>
-                  <span className="text-zinc-200 font-semibold">{durationHours} Horas</span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span>Tarifa Parqueadero:</span>
-                  <span className="text-emerald-400 font-mono font-medium">
-                    ${parkingFeePerHour.toLocaleString('es-CO')}/h (+${vehicleParkingFee.toLocaleString('es-CO')} solo vehículos)
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+                    {/* Live Match Stopwatch Control & Timer */}
+          <MatchLiveStopwatch
+            matchId={match.id}
+            matchLocation={match.location}
+            durationHours={durationHours}
+          />
 
-            {/* Attendance Metrics */}
-            <Card className="border-zinc-800 bg-zinc-900/60 shadow-md">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-zinc-400 flex items-center gap-1.5 text-xs">
-                  <Users className="w-4 h-4 text-emerald-400" /> Nómina & Cupo Oficial
-                </CardDescription>
-                <CardTitle className="text-2xl font-mono text-white">
-                  {confirmedCount} <span className="text-sm font-sans text-zinc-500">/ {maxPlayers}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-xs text-zinc-400 space-y-1">
-                <div className="flex justify-between py-1 border-b border-zinc-800">
-                  <span>Presentes en Cancha (Check-In):</span>
-                  <span className="text-emerald-400 font-semibold">{attendedCount} jugadores</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-zinc-800">
-                  <span>Acompañantes / Barra (No juegan):</span>
-                  <span className="text-blue-400 font-semibold">{companionCount} acompañantes 👥</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-zinc-800">
-                  <span>Vehículos Registrados:</span>
-                  <span className="text-zinc-200 font-semibold">{vehicleList.length} vehículos 🚗</span>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span>Lista de Espera:</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-400 font-semibold">{waitlistCount} en espera</span>
-                    {waitlistCount > 0 && confirmedCount < maxPlayers && !isSettled && (
-                      <button
-                        type="button"
-                        onClick={handleReconcileAttendances}
-                        disabled={isPending}
-                        className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-colors"
-                        title="Promover jugadores en espera automáticamente"
-                      >
-                        <RefreshCw className={`w-3 h-3 ${isPending ? 'animate-spin' : ''}`} />
-                        Promover ({Math.min(waitlistCount, maxPlayers - confirmedCount)})
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Minimalist 4-KPI Metric Chips */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 shadow-sm">
+              <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-emerald-400" /> Nómina Oficial
+              </div>
+              <div className="mt-1 flex items-baseline gap-1.5">
+                <span className="text-xl font-black font-mono text-white">
+                  {confirmedCount}
+                </span>
+                <span className="text-xs text-zinc-500 font-mono">/ {maxPlayers} cupos</span>
+              </div>
+              <div className="mt-1 text-[11px] text-zinc-400">
+                {attendedCount} en cancha • {companionCount} acompañantes
+              </div>
+            </div>
 
-            {/* Real-time Dynamic Fee Calculation */}
-            <Card className="border-zinc-800 bg-zinc-900/60 shadow-md">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-zinc-400 flex items-center gap-1.5 text-xs">
-                  <DollarSign className="w-4 h-4 text-emerald-400" /> Cuota Dinámica por Jugador
-                </CardDescription>
-                <CardTitle className="text-2xl font-mono text-emerald-400">
-                  ${basePitchFee.toLocaleString('es-CO')} COP
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-xs text-zinc-400 space-y-1">
-                <div className="flex justify-between py-1 border-b border-zinc-800">
-                  <span>Base Cupo Lleno ({maxPlayers} jg):</span>
-                  <span className="font-mono text-zinc-400 font-medium">
-                    ${fullCapacityPitchFee.toLocaleString('es-CO')} COP
-                  </span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-zinc-800">
-                  <span>Inscritos Actuales ({confirmedCount} jg):</span>
-                  <span className="font-mono text-amber-300 font-semibold">
-                    ${dynamicPitchFee.toLocaleString('es-CO')} COP
-                  </span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span>Con Vehículo:</span>
-                  <span className="font-mono text-emerald-400 font-bold">
-                    +${vehicleParkingFee.toLocaleString('es-CO')} COP ({durationHours}h)
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 shadow-sm">
+              <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5 text-emerald-400" /> Cuota Cancha
+              </div>
+              <div className="mt-1 flex items-baseline gap-1.5">
+                <span className="text-xl font-black font-mono text-emerald-400">
+                  ${basePitchFee.toLocaleString('es-CO')}
+                </span>
+                <span className="text-[10px] text-zinc-500">COP c/u</span>
+              </div>
+              <div className="mt-1 text-[11px] text-zinc-400 font-mono">
+                Base ${fullCapacityPitchFee.toLocaleString('es-CO')} ({maxPlayers}j)
+              </div>
+            </div>
+
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 shadow-sm">
+              <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Car className="w-3.5 h-3.5 text-amber-400" /> Vehículos
+              </div>
+              <div className="mt-1 flex items-baseline gap-1.5">
+                <span className="text-xl font-black font-mono text-amber-300">
+                  {vehicleList.length}
+                </span>
+                <span className="text-xs text-zinc-500">con parqueadero</span>
+              </div>
+              <div className="mt-1 text-[11px] text-zinc-400">
+                +${vehicleParkingFee.toLocaleString('es-CO')} COP / vehículo
+              </div>
+            </div>
+
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 shadow-sm">
+              <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Wallet className="w-3.5 h-3.5 text-sky-400" /> Alquiler Cancha
+              </div>
+              <div className="mt-1 flex items-baseline gap-1.5">
+                <span className="text-xl font-black font-mono text-white">
+                  ${match.pitchRentalCost.toLocaleString('es-CO')}
+                </span>
+                <span className="text-[10px] text-zinc-500">COP</span>
+              </div>
+              <div className="mt-1 text-[11px] text-zinc-400">
+                {durationHours} horas de juego
+              </div>
+            </div>
           </div>
 
-          {/* Direct RSVP Shareable Banner */}
-          <Card className="border-emerald-700/50 bg-gradient-to-r from-zinc-900 via-zinc-900 to-emerald-950/30">
-            <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-emerald-950/80 border border-emerald-700/50 rounded-lg text-emerald-400">
-                  <Share2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white">
-                    Link de Inscripción para Jugadores (RSVP)
-                  </h3>
-                  <p className="text-xs text-zinc-400 font-mono">
-                    /rsvp/{match.id}
-                  </p>
-                </div>
-              </div>
+          {/* Minimalist Segmented Tabs */}
+          <div className="flex items-center justify-between border-b border-zinc-800 pt-2">
+            <div className="flex gap-1 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('roster')}
+                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                  activeTab === 'roster'
+                    ? 'border-emerald-500 text-emerald-400'
+                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>Nómina & Asistencia</span>
+                <Badge variant="outline" className="text-[10px] border-emerald-800/80 text-emerald-300 py-0 px-1.5">
+                  {confirmedCount}
+                </Badge>
+              </button>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  onClick={handleCopyWhatsAppRoster}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs gap-1.5 border-emerald-700/60 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50"
-                  title="Copiar nómina deportiva completa para el grupo de WhatsApp"
-                >
-                  <Copy className="w-3.5 h-3.5 text-emerald-400" /> Copiar WhatsApp
-                </Button>
-                <Button
-                  onClick={handleCopyGateRoster}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs gap-1.5 border-blue-700/60 bg-blue-950/40 text-blue-300 hover:bg-blue-900/50"
-                  title="Copiar planilla formal para portería y vigilancia"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-blue-400" /> Copiar Portería
-                </Button>
-                <Button
-                  onClick={() => setShowRosterShareModal(true)}
-                  size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs gap-1.5 font-medium"
-                >
-                  <Share2 className="w-3.5 h-3.5" /> Vista Previa & Compartir
-                </Button>
-                <Link href={`/rsvp/${match.id}`} target="_blank">
-                  <Button variant="ghost" size="sm" className="text-xs gap-1 text-zinc-400 hover:text-white">
-                    <ExternalLink className="w-3.5 h-3.5" /> Ver RSVP
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Guest Registration Form (+1) */}
-          {!isSettled && (
-            <Card className="border-zinc-800 bg-zinc-900/40">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2 text-zinc-200">
-                  <UserPlus className="w-4 h-4 text-emerald-400" /> Registrar Invitado (+1) para este Partido
-                </CardTitle>
-                <CardDescription className="text-xs text-zinc-400">
-                  Clasifica si el invitado jugará en cancha (ocupa cupo y paga cuota) o es acompañante/barra (no juega y cuota cancha es $0).
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleAddGuest} className="flex flex-col sm:flex-row gap-3 items-end">
-                  <div className="w-full sm:w-1/4">
-                    <label className="text-xs text-zinc-400 block mb-1">Jugador Anfitrión:</label>
-                    <select
-                      value={selectedHostPlayerId}
-                      onChange={(e) => setSelectedHostPlayerId(e.target.value)}
-                      className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    >
-                      {players.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {getPlayerDisplayName(p)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="w-full sm:w-1/4">
-                    <label className="text-xs text-zinc-400 block mb-1">Tipo de Invitado:</label>
-                    <select
-                      value={guestTypeForNewGuest}
-                      onChange={(e) => setGuestTypeForNewGuest(e.target.value as 'PLAYER' | 'COMPANION')}
-                      className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    >
-                      <option value="PLAYER">⚽ Invitado Jugador (Juega)</option>
-                      <option value="COMPANION">👥 Acompañante (No juega - $0)</option>
-                    </select>
-                  </div>
-                  <div className="w-full sm:flex-1">
-                    <label className="text-xs text-zinc-400 block mb-1">Nombre del Invitado (+1):</label>
-                    <input
-                      type="text"
-                      placeholder="Ej: Camilo Andrés / Natalia Cifuentes"
-                      value={guestName}
-                      onChange={(e) => setGuestName(e.target.value)}
-                      className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs rounded-md px-3 py-2 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-                  <Button
-                    type="submit"
-                    disabled={isPending || !guestName.trim()}
-                    size="sm"
-                    className="w-full sm:w-auto text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
-                  >
-                    + Registrar Invitado
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Attendances & Playing Squad Table (ONLY PLAYERS) */}
-          <Card className="border-zinc-800 bg-zinc-900/60 shadow-md overflow-hidden">
-            <CardHeader className="pb-3 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <CardTitle className="text-base font-semibold flex items-center gap-2 text-white">
-                  <Users className="w-4 h-4 text-emerald-400" /> Nómina Oficial de Jugadores ({confirmedCount}/{maxPlayers})
-                </CardTitle>
-                <CardDescription className="text-xs text-zinc-400">
-                  Control de asistencia en cancha, lista de espera automática a partir de {maxPlayers} jugadores y liquidación individual.
-                </CardDescription>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  onClick={handleCopyWhatsAppRoster}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs h-7 gap-1 border-zinc-700 hover:bg-zinc-800 text-emerald-300"
-                  title="Copiar nómina deportiva completa para el grupo de WhatsApp"
-                >
-                  <Copy className="w-3.5 h-3.5 text-emerald-400" />
-                  Nómina WhatsApp
-                </Button>
-                <Button
-                  onClick={handleCopyGateRoster}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs h-7 gap-1 border-zinc-700 hover:bg-zinc-800 text-blue-300"
-                  title="Copiar planilla formal para portería y vigilancia"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-                  Portería
-                </Button>
-                {vehicleList.length > 0 && (
-                  <Button
-                    onClick={handleCopyParkingList}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs h-7 gap-1 border-zinc-700 hover:bg-zinc-800 text-zinc-300"
-                    title="Copiar lista de placas para la administración/portería"
-                  >
-                    <Car className="w-3.5 h-3.5 text-emerald-400" />
-                    Vehículos ({vehicleList.length})
-                  </Button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('finances')}
+                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                  activeTab === 'finances'
+                    ? 'border-emerald-500 text-emerald-400'
+                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <DollarSign className="w-4 h-4" />
+                <span>Liquidación</span>
+                {isSettled && (
+                  <Badge variant="success" className="text-[9px] py-0 px-1">
+                    Cerrado
+                  </Badge>
                 )}
-                <span className="text-xs font-mono text-zinc-400 bg-zinc-800 px-2 py-1 rounded">
-                  {attendances.filter((a) => a.guestType !== 'COMPANION').length} jugadores
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {attendances.filter((a) => a.guestType !== 'COMPANION').length === 0 ? (
-                <div className="p-8 text-center text-zinc-500 text-sm">
-                  Aún no hay jugadores inscritos para este partido. ¡Comparte el enlace de WhatsApp para abrir la convocatoria!
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-zinc-800 hover:bg-transparent">
-                      <TableHead className="w-8">#</TableHead>
-                      <TableHead>Jugador / Invitado Jugador</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Cuota Asignada</TableHead>
-                      {!isSettled && <TableHead className="text-right">Acciones de Cancha</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {attendances
-                      .filter((a) => a.guestType !== 'COMPANION')
-                      .map((att, idx) => {
-                        const isAttended = att.status === 'ATTENDED';
-                        const isWaitlist = att.status === 'WAITLIST';
-                        const isCancelled = att.status === 'CANCELLED';
+              </button>
 
-                        const badgeVariant = isAttended
-                          ? 'success'
-                          : isWaitlist
-                          ? 'warning'
-                          : isCancelled
-                          ? 'destructive'
-                          : 'default';
+              <button
+                type="button"
+                onClick={() => setActiveTab('share')}
+                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                  activeTab === 'share'
+                    ? 'border-emerald-500 text-emerald-400'
+                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Difusión & Portería</span>
+              </button>
+            </div>
 
-                        const isVehicleDriver = !!(att.hasVehicle || att.vehiclePlate);
-                        const playerFee = basePitchFee + (isVehicleDriver ? vehicleParkingFee : 0);
+            <Link href={`/rsvp/${match.id}`} target="_blank" className="hidden sm:inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-emerald-400 transition-colors pb-2">
+              <ExternalLink className="w-3.5 h-3.5" /> Link RSVP
+            </Link>
+          </div>
 
-                        return (
-                          <TableRow key={att.id} className={isCancelled ? 'opacity-50' : ''}>
-                            <TableCell className="text-xs font-mono text-zinc-500 w-8">
-                              #{idx + 1}
-                            </TableCell>
-                            <TableCell className="align-middle">
-                              {renderAttendanceName(att)}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={badgeVariant} className="text-[10px]">
-                                {att.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {isAttended ? (
-                                <div>
-                                  <span className="font-bold text-emerald-400">
-                                    ${playerFee.toLocaleString('es-CO')} COP
-                                  </span>
-                                  {isVehicleDriver && (
-                                    <span className="text-[10px] text-zinc-400 block font-normal">
-                                      (${basePitchFee.toLocaleString('es-CO')} cancha + 🚗 ${vehicleParkingFee.toLocaleString('es-CO')} parqueadero)
+          {/* TAB 1: NÓMINA Y ASISTENCIA */}
+          {activeTab === 'roster' && (
+            <div className="space-y-5 animate-in fade-in duration-150">
+              {/* Guest Registration Form (+1) */}
+              {!isSettled && (
+                <Card className="border-zinc-800/80 bg-zinc-900/40">
+                  <CardHeader className="py-3 px-4">
+                    <CardTitle className="text-xs font-semibold flex items-center gap-2 text-zinc-300">
+                      <UserPlus className="w-3.5 h-3.5 text-emerald-400" /> Registrar Invitado (+1)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-4 pb-4 pt-0">
+                    <form onSubmit={handleAddGuest} className="flex flex-col sm:flex-row gap-2.5 items-end">
+                      <div className="w-full sm:w-1/4">
+                        <label className="text-[11px] text-zinc-400 block mb-1">Anfitrión:</label>
+                        <select
+                          value={selectedHostPlayerId}
+                          onChange={(e) => setSelectedHostPlayerId(e.target.value)}
+                          className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        >
+                          {players.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {getPlayerDisplayName(p)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="w-full sm:w-1/4">
+                        <label className="text-[11px] text-zinc-400 block mb-1">Tipo:</label>
+                        <select
+                          value={guestTypeForNewGuest}
+                          onChange={(e) => setGuestTypeForNewGuest(e.target.value as 'PLAYER' | 'COMPANION')}
+                          className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        >
+                          <option value="PLAYER">⚽ Invitado Jugador (Juega)</option>
+                          <option value="COMPANION">👥 Acompañante (No juega - $0)</option>
+                        </select>
+                      </div>
+                      <div className="w-full sm:flex-1">
+                        <label className="text-[11px] text-zinc-400 block mb-1">Nombre Invitado:</label>
+                        <input
+                          type="text"
+                          placeholder="Nombre y Apellido del invitado"
+                          value={guestName}
+                          onChange={(e) => setGuestName(e.target.value)}
+                          className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs rounded-lg px-2.5 py-1.5 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <Button
+                        type="submit"
+                        disabled={isPending || !guestName.trim()}
+                        size="sm"
+                        className="w-full sm:w-auto text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
+                      >
+                        + Agregar
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Attendances & Playing Squad Table (ONLY PLAYERS) */}
+              <Card className="border-zinc-800 bg-zinc-900/60 shadow-md overflow-hidden">
+                <CardHeader className="py-3 px-4 border-b border-zinc-800 flex flex-row items-center justify-between gap-2">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2 text-white">
+                    <Users className="w-4 h-4 text-emerald-400" /> Nómina Oficial de Jugadores ({confirmedCount}/{maxPlayers})
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleCopyWhatsAppRoster}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 gap-1 border-zinc-700 hover:bg-zinc-800 text-emerald-300"
+                      title="Copiar nómina deportiva para WhatsApp"
+                    >
+                      <Copy className="w-3 h-3 text-emerald-400" />
+                      WhatsApp
+                    </Button>
+                    <span className="text-xs font-mono text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">
+                      {attendances.filter((a) => a.guestType !== 'COMPANION').length} registrados
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {attendances.filter((a) => a.guestType !== 'COMPANION').length === 0 ? (
+                    <div className="p-8 text-center text-zinc-500 text-sm">
+                      Aún no hay jugadores inscritos para este partido.
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-zinc-800 hover:bg-transparent text-xs">
+                          <TableHead className="w-8">#</TableHead>
+                          <TableHead>Jugador</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead>Cuota</TableHead>
+                          {!isSettled && <TableHead className="text-right">Acciones</TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {attendances
+                          .filter((a) => a.guestType !== 'COMPANION')
+                          .map((att, idx) => {
+                            const isAttended = att.status === 'ATTENDED';
+                            const isWaitlist = att.status === 'WAITLIST';
+                            const isCancelled = att.status === 'CANCELLED';
+
+                            const badgeVariant = isAttended
+                              ? 'success'
+                              : isWaitlist
+                              ? 'warning'
+                              : isCancelled
+                              ? 'destructive'
+                              : 'default';
+
+                            const isVehicleDriver = !!(att.hasVehicle || att.vehiclePlate);
+                            const playerFee = basePitchFee + (isVehicleDriver ? vehicleParkingFee : 0);
+
+                            return (
+                              <TableRow key={att.id} className={isCancelled ? 'opacity-50 text-xs' : 'text-xs'}>
+                                <TableCell className="text-xs font-mono text-zinc-500 w-8">
+                                  #{idx + 1}
+                                </TableCell>
+                                <TableCell className="align-middle">
+                                  {renderAttendanceName(att)}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={badgeVariant} className="text-[10px]">
+                                    {att.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="font-mono text-xs">
+                                  {isAttended ? (
+                                    <div>
+                                      <span className="font-bold text-emerald-400">
+                                        ${playerFee.toLocaleString('es-CO')} COP
+                                      </span>
+                                    </div>
+                                  ) : isCancelled ? (
+                                    <span className="text-zinc-500">$0</span>
+                                  ) : (
+                                    <div>
+                                      <span className="text-zinc-400 font-medium">
+                                        ${playerFee.toLocaleString('es-CO')} COP
+                                      </span>
+                                      <span className="text-[9px] text-zinc-500 block">
+                                        (Pendiente)
+                                      </span>
+                                    </div>
+                                  )}
+                                </TableCell>
+                                {!isSettled && (
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                      {!isCancelled && (
+                                        <Button
+                                          onClick={() => {
+                                            const host = getPlayer(att.playerId);
+                                            const suggested = isAttended && playerFee > 0 ? playerFee : dynamicPitchFee;
+                                            setCashModalPlayer({
+                                              id: att.playerId,
+                                              name: host?.fullName || att.playerId,
+                                              suggestedAmount: suggested,
+                                            });
+                                            setCashAmount(suggested);
+                                            setCashNote(`Pago en efectivo cancha - ${match.location}`);
+                                          }}
+                                          disabled={isPending}
+                                          variant="outline"
+                                          size="sm"
+                                          className="text-xs h-7 px-2 border-emerald-600/40 text-emerald-400 hover:bg-emerald-950/50"
+                                          title="Registrar pago recibido en efectivo"
+                                        >
+                                          💵 Efectivo
+                                        </Button>
+                                      )}
+                                      {!isCancelled && !isWaitlist && (
+                                        <Button
+                                          onClick={() => handleCheckinToggle(att.id, att.status)}
+                                          disabled={isPending}
+                                          variant={isAttended ? 'secondary' : 'default'}
+                                          size="sm"
+                                          className="text-xs h-7 px-2"
+                                        >
+                                          <UserCheck className="w-3.5 h-3.5 mr-1" />
+                                          {isAttended ? 'Ausente' : 'Presente'}
+                                        </Button>
+                                      )}
+                                      {!isCancelled && (
+                                        <Button
+                                          onClick={() => handleCancelAttendance(att.id)}
+                                          disabled={isPending}
+                                          variant="destructive"
+                                          size="sm"
+                                          className="text-xs h-7 px-2"
+                                        >
+                                          <UserX className="w-3.5 h-3.5 mr-1" />
+                                          Cancelar
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                )}
+                              </TableRow>
+                            );
+                          })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Companions & Spectators Section */}
+              {companionCount > 0 && (
+                <Card className="border-blue-900/40 bg-zinc-900/40 shadow-sm overflow-hidden">
+                  <CardHeader className="py-2.5 px-4 border-b border-zinc-800 flex flex-row items-center justify-between">
+                    <CardTitle className="text-xs font-semibold flex items-center gap-2 text-blue-300">
+                      <Users className="w-3.5 h-3.5 text-blue-400" /> Acompañantes & Barra ({companionCount}) — No pagan cancha
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableBody>
+                        {attendances
+                          .filter((a) => a.guestType === 'COMPANION')
+                          .map((att, idx) => {
+                            const hostPlayer = getPlayer(att.playerId);
+                            return (
+                              <TableRow key={att.id} className="text-xs hover:bg-blue-950/10">
+                                <TableCell className="text-xs font-mono text-zinc-500 w-8">
+                                  #{idx + 1}
+                                </TableCell>
+                                <TableCell className="font-semibold text-blue-300">
+                                  👥 {att.guestName || 'Acompañante'}
+                                </TableCell>
+                                <TableCell className="text-zinc-400">
+                                  con {getPlayerDisplayName(hostPlayer, att.playerId)}
+                                </TableCell>
+                                <TableCell>
+                                  {att.vehiclePlate ? (
+                                    <span className="font-mono text-emerald-400 font-bold bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
+                                      {formatPlateBadge(att.vehiclePlate)}
                                     </span>
+                                  ) : (
+                                    <span className="text-zinc-500">Sin vehículo</span>
                                   )}
-                                </div>
-                              ) : isCancelled ? (
-                                <span className="text-zinc-500">$0</span>
-                              ) : (
-                                <div>
-                                  <span className="text-zinc-400 font-medium">
-                                    ${playerFee.toLocaleString('es-CO')} COP
-                                  </span>
-                                  <span className="text-[10px] text-zinc-500 block">
-                                    (Pendiente check-in)
-                                  </span>
-                                </div>
-                              )}
-                            </TableCell>
-                            {!isSettled && (
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                                  {!isCancelled && (
-                                    <Button
-                                      onClick={() => {
-                                        const host = getPlayer(att.playerId);
-                                        const suggested = isAttended && playerFee > 0 ? playerFee : dynamicPitchFee;
-                                        setCashModalPlayer({
-                                          id: att.playerId,
-                                          name: host?.fullName || att.playerId,
-                                          suggestedAmount: suggested,
-                                        });
-                                        setCashAmount(suggested);
-                                        setCashNote(`Pago en efectivo cancha - ${match.location}`);
-                                      }}
-                                      disabled={isPending}
-                                      variant="outline"
-                                      size="sm"
-                                      className="text-xs h-7 px-2 border-emerald-600/40 text-emerald-400 hover:bg-emerald-950/50"
-                                      title="Registrar pago recibido en efectivo en la cancha"
-                                    >
-                                      💵 Efectivo
-                                    </Button>
-                                  )}
-                                  {att.guestName && !isCancelled && (
-                                    <Button
-                                      onClick={() => handleToggleGuestType(att.id, att.guestType)}
-                                      disabled={isPending}
-                                      variant="outline"
-                                      size="sm"
-                                      className="text-[10px] h-7 px-2 border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-                                      title="Mover a lista de acompañantes (no juega fútbol)"
-                                    >
-                                      <RefreshCw className="w-3 h-3 mr-1 text-blue-400" />
-                                      Pasar a Acompañante 👥
-                                    </Button>
-                                  )}
-                                  {!isCancelled && !isWaitlist && (
-                                    <Button
-                                      onClick={() => handleCheckinToggle(att.id, att.status)}
-                                      disabled={isPending}
-                                      variant={isAttended ? 'secondary' : 'default'}
-                                      size="sm"
-                                      className="text-xs h-7 px-2"
-                                    >
-                                      <UserCheck className="w-3.5 h-3.5 mr-1" />
-                                      {isAttended ? 'Ausente' : 'Presente'}
-                                    </Button>
-                                  )}
-                                  {!isCancelled && (
+                                </TableCell>
+                                {!isSettled && (
+                                  <TableCell className="text-right">
                                     <Button
                                       onClick={() => handleCancelAttendance(att.id)}
                                       disabled={isPending}
                                       variant="destructive"
                                       size="sm"
-                                      className="text-xs h-7 px-2"
+                                      className="text-xs h-6 px-2"
                                     >
-                                      <UserX className="w-3.5 h-3.5 mr-1" />
                                       Cancelar
                                     </Button>
-                                  )}
-                                </div>
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        );
-                      })}
-                  </TableBody>
-                </Table>
+                                  </TableCell>
+                                )}
+                              </TableRow>
+                            );
+                          })}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          )}
 
-          {/* Companions & Spectators Section (Separate Card for non-playing guests) */}
-          <Card className="border-blue-900/40 bg-gradient-to-b from-zinc-900 via-zinc-900 to-blue-950/20 shadow-md overflow-hidden">
-            <CardHeader className="pb-3 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <CardTitle className="text-base font-semibold flex items-center gap-2 text-blue-200">
-                  <Users className="w-4 h-4 text-blue-400" /> 👥 Acompañantes & Barra (No Juegan) ({companionCount})
-                </CardTitle>
-                <CardDescription className="text-xs text-zinc-400">
-                  Personas registradas como acompañantes / espectadores. No ocupan cupo en los {maxPlayers} de la nómina y su cuota de cancha es $0 COP.
-                </CardDescription>
-              </div>
-              <span className="text-xs font-mono text-blue-300 bg-blue-950/60 border border-blue-800/60 px-2 py-1 rounded">
-                Cuota Cancha: $0 COP
-              </span>
-            </CardHeader>
-            <CardContent className="p-0">
-              {attendances.filter((a) => a.guestType === 'COMPANION').length === 0 ? (
-                <div className="p-6 text-center text-zinc-500 text-xs">
-                  No hay acompañantes registrados para este partido.
+          {/* TAB 2: LIQUIDACIÓN FINANCIERA */}
+          {activeTab === 'finances' && (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              <Card className="border-zinc-800 bg-zinc-900/60 p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <div>
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      <DollarSign className="w-5 h-5 text-emerald-400" /> Resumen de Liquidación
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Cálculo final de cuotas, egresos y recaudación del partido.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleSettle}
+                    disabled={isSettled || isPending || attendedCount === 0}
+                    variant={isSettled ? 'secondary' : 'default'}
+                    size="sm"
+                    className="font-bold text-xs"
+                  >
+                    {isPending ? 'Liquidando...' : isSettled ? '✓ Partido Liquidado' : 'Liquidar Partido'}
+                  </Button>
                 </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-zinc-800 hover:bg-transparent">
-                      <TableHead className="w-8">#</TableHead>
-                      <TableHead>Nombre del Acompañante</TableHead>
-                      <TableHead>Acompaña a (Jugador)</TableHead>
-                      <TableHead>Vehículo / Placa</TableHead>
-                      <TableHead>Cuota Cancha</TableHead>
-                      {!isSettled && <TableHead className="text-right">Acciones</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {attendances
-                      .filter((a) => a.guestType === 'COMPANION')
-                      .map((att, idx) => {
-                        const hostPlayer = getPlayer(att.playerId);
-                        const isCancelled = att.status === 'CANCELLED';
-                        const isVehicleDriver = !!(att.hasVehicle || att.vehiclePlate);
-                        const companionFee = isVehicleDriver ? vehicleParkingFee : 0;
 
-                        return (
-                          <TableRow key={att.id} className={isCancelled ? 'opacity-50' : 'hover:bg-blue-950/10'}>
-                            <TableCell className="text-xs font-mono text-zinc-500 w-8">
-                              #{idx + 1}
-                            </TableCell>
-                            <TableCell className="font-semibold text-blue-300 text-sm">
-                              👥 {att.guestName || 'Acompañante'}
-                            </TableCell>
-                            <TableCell className="text-xs text-zinc-300">
-                              ⚽ {getPlayerDisplayName(hostPlayer, att.playerId)}
-                            </TableCell>
-                            <TableCell className="text-xs">
-                              {att.vehiclePlate ? (
-                                <span className="font-mono text-emerald-400 font-bold bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
-                                  {formatPlateBadge(att.vehiclePlate)}
-                                </span>
-                              ) : (
-                                <span className="text-zinc-500 text-xs">Sin vehículo</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              <span className="text-zinc-300 font-medium">
-                                ${companionFee.toLocaleString('es-CO')} COP
-                              </span>
-                              <span className="text-[10px] text-zinc-500 block">
-                                ($0 cancha {isVehicleDriver ? `+ 🚗 $${vehicleParkingFee.toLocaleString('es-CO')} parqueadero` : ''})
-                              </span>
-                            </TableCell>
-                            {!isSettled && (
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  {!isCancelled && (
-                                    <>
-                                      <Button
-                                        onClick={() => handleToggleGuestType(att.id, 'COMPANION')}
-                                        disabled={isPending}
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-xs h-7 px-2.5 border-emerald-700/60 text-emerald-300 hover:bg-emerald-950"
-                                        title="Pasar a jugador de nómina oficial en cancha"
-                                      >
-                                        <RefreshCw className="w-3 h-3 mr-1 text-emerald-400" />
-                                        Pasar a Jugador ⚽
-                                      </Button>
-                                      <Button
-                                        onClick={() => handleCancelAttendance(att.id)}
-                                        disabled={isPending}
-                                        variant="destructive"
-                                        size="sm"
-                                        className="text-xs h-7 px-2"
-                                      >
-                                        <UserX className="w-3.5 h-3.5 mr-1" />
-                                        Cancelar
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        );
-                      })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                  <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+                    <span className="text-zinc-400 block mb-1">Costo Cancha:</span>
+                    <span className="text-lg font-mono font-bold text-white">
+                      ${match.pitchRentalCost.toLocaleString('es-CO')} COP
+                    </span>
+                  </div>
+                  <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+                    <span className="text-zinc-400 block mb-1">Cuota Final por Jugador:</span>
+                    <span className="text-lg font-mono font-bold text-emerald-400">
+                      ${basePitchFee.toLocaleString('es-CO')} COP
+                    </span>
+                  </div>
+                  <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+                    <span className="text-zinc-400 block mb-1">Jugadores que Pagan:</span>
+                    <span className="text-lg font-mono font-bold text-amber-300">
+                      {attendedCount > 0 ? attendedCount : confirmedCount} jugadores
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* TAB 3: DIFUSIÓN Y PORTERÍA */}
+          {activeTab === 'share' && (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              <Card className="border-zinc-800 bg-zinc-900/60 p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                  <div>
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      <Share2 className="w-5 h-5 text-emerald-400" /> Convocatoria & Acceso a Portería
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Textos formateados listos para copiar con 1 toque.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleCopyWhatsAppRoster}
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold gap-1.5"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Copiar WhatsApp
+                    </Button>
+                    <Button
+                      onClick={handleCopyGateRoster}
+                      variant="outline"
+                      size="sm"
+                      className="border-blue-700/60 text-blue-300 hover:bg-blue-950 text-xs font-bold gap-1.5"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" /> Copiar Portería
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-xs font-mono text-zinc-300 space-y-2">
+                  <div className="text-[11px] text-zinc-500 uppercase font-bold tracking-wider">
+                    Enlace de inscripción directa (RSVP):
+                  </div>
+                  <div className="text-emerald-400 break-all select-all">
+                    /rsvp/{match.id}
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
         </>
       )}
 
