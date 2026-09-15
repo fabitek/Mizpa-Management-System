@@ -34,10 +34,12 @@ import {
 } from '../../core/utils/plate-formatter.ts';
 import { copyToClipboard } from '../../core/utils/clipboard.ts';
 import { MatchLiveStopwatch } from './MatchLiveStopwatch.tsx';
+import { MatchGoalsTracker } from './MatchGoalsTracker.tsx';
 import {
   Calendar,
   MapPin,
   Users,
+  Target,
   DollarSign,
   CheckCircle2,
   AlertCircle,
@@ -140,7 +142,7 @@ export function MatchSettlementCard({
   const [cashNote, setCashNote] = useState<string>('');
 
   // Minimalist active tab navigation
-  const [activeTab, setActiveTab] = useState<'roster' | 'live' | 'finances' | 'share'>('roster');
+  const [activeTab, setActiveTab] = useState<'roster' | 'goals' | 'finances' | 'share'>('roster');
 
   const isSettled = match ? match.status === 'SETTLED' : false;
   const durationHours = match?.durationHours ?? 2;
@@ -1444,6 +1446,19 @@ export function MatchSettlementCard({
 
               <button
                 type="button"
+                onClick={() => setActiveTab('goals')}
+                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                  activeTab === 'goals'
+                    ? 'border-emerald-500 text-emerald-400'
+                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <Target className="w-4 h-4" />
+                <span>Goles & Marcador ⚽</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setActiveTab('finances')}
                 className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
                   activeTab === 'finances'
@@ -1747,6 +1762,18 @@ export function MatchSettlementCard({
                   </CardContent>
                 </Card>
               )}
+            </div>
+          )}
+
+          {/* TAB: GOLES Y MARCADOR */}
+          {activeTab === 'goals' && (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              <MatchGoalsTracker
+                match={match}
+                roster={confirmedRoster}
+                allPlayers={allPlayers}
+                onGoalRecorded={loadData}
+              />
             </div>
           )}
 

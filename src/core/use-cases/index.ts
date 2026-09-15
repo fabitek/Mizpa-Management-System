@@ -28,5 +28,7 @@ export * from './DeleteOperatingExpense.ts';
 export * from './ProcessReceiptOcr.ts';
 export * from './CheckAndNotifyCapacityReached.ts';
 export * from './ReconcileMatchAttendances.ts';
+export * from './DeleteGoal.ts';
+export * from './GetMatchGoals.ts';
 export * from '../utils/capacity-formatters.ts';
 

@@ -61,6 +61,8 @@ import {
   DeleteMatchUseCase,
   CheckAndNotifyCapacityReachedUseCase,
   ReconcileMatchAttendancesUseCase,
+  DeleteGoalUseCase,
+  GetMatchGoalsUseCase,
 } from '../core/use-cases/index.ts';
 import { initialMatches, initialAttendances, initialGoals, initialNotifications, initialPlayers } from './seed-data.ts';
 
@@ -96,6 +98,8 @@ export interface DIContainer {
   deleteOperatingExpenseUseCase: DeleteOperatingExpenseUseCase;
   processReceiptOcrUseCase: ProcessReceiptOcrUseCase;
   recordGoalEventUseCase: RecordGoalEventUseCase;
+  deleteGoalUseCase: DeleteGoalUseCase;
+  getMatchGoalsUseCase: GetMatchGoalsUseCase;
   getTopScorersUseCase: GetTopScorersUseCase;
   getPlayerStatsUseCase: GetPlayerStatsUseCase;
   assignMatchMvpUseCase: AssignMatchMvpUseCase;
@@ -219,6 +223,8 @@ function createContainer(): DIContainer {
   const processReceiptOcrUseCase = new ProcessReceiptOcrUseCase();
 
   const recordGoalEventUseCase = new RecordGoalEventUseCase(matchRepository, goalRepository);
+  const deleteGoalUseCase = new DeleteGoalUseCase(goalRepository);
+  const getMatchGoalsUseCase = new GetMatchGoalsUseCase(goalRepository);
   const getTopScorersUseCase = new GetTopScorersUseCase(goalRepository, attendanceRepository);
   const getPlayerStatsUseCaseInst = new GetPlayerStatsUseCase(
     goalRepository,
@@ -290,6 +296,8 @@ function createContainer(): DIContainer {
     deleteOperatingExpenseUseCase,
     processReceiptOcrUseCase,
     recordGoalEventUseCase,
+    deleteGoalUseCase,
+    getMatchGoalsUseCase,
     getTopScorersUseCase,
     getPlayerStatsUseCase: getPlayerStatsUseCaseInst,
     assignMatchMvpUseCase,
@@ -336,6 +344,8 @@ export const {
   deleteOperatingExpenseUseCase,
   processReceiptOcrUseCase,
   recordGoalEventUseCase,
+  deleteGoalUseCase,
+  getMatchGoalsUseCase,
   getTopScorersUseCase,
   getPlayerStatsUseCase,
   assignMatchMvpUseCase,

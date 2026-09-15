@@ -3,12 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import {
   recordGoalEventUseCase,
+  deleteGoalUseCase,
+  getMatchGoalsUseCase,
   getTopScorersUseCase,
   getPlayerStatsUseCase,
   assignMatchMvpUseCase,
   getLeaderboardOverviewUseCase,
 } from '../../infrastructure/container.ts';
-import type { GoalType } from '../../core/domain/types.ts';
+import type { GoalType, GoalEvent } from '../../core/domain/types.ts';
 
 export interface StatsActionResult<T = unknown> {
   success: boolean;
@@ -21,7 +23,7 @@ export async function recordGoalAction(
   playerId: string,
   minute?: number,
   type: GoalType = 'OPEN_PLAY'
-): Promise<StatsActionResult> {
+): Promise<StatsActionResult<GoalEvent>> {
   try {
     const goal = await recordGoalEventUseCase.execute({
       matchId,
@@ -35,13 +37,53 @@ export async function recordGoalAction(
 
     return {
       success: true,
-      message: 'Gol registrado exitosamente en el partido.',
+      message: 'Gol registrado exitosamente.',
       data: goal,
     };
   } catch (error) {
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Error al registrar el gol.',
+    };
+  }
+}
+
+export async function deleteGoalAction(
+  goalId: string,
+  matchId?: string
+): Promise<StatsActionResult> {
+  try {
+    await deleteGoalUseCase.execute({ goalId });
+
+    revalidatePath('/stats');
+    revalidatePath('/matches');
+
+    return {
+      success: true,
+      message: 'Gol eliminado exitosamente.',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al eliminar el gol.',
+    };
+  }
+}
+
+export async function getMatchGoalsAction(
+  matchId: string
+): Promise<StatsActionResult<GoalEvent[]>> {
+  try {
+    const goals = await getMatchGoalsUseCase.execute(matchId);
+    return {
+      success: true,
+      message: 'Goles del partido obtenidos.',
+      data: goals,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al obtener goles del partido.',
     };
   }
 }
