@@ -42,6 +42,7 @@ import {
   Smartphone,
   QrCode,
   Zap,
+  X,
 } from 'lucide-react';
 
 interface PublicRsvpViewProps {
@@ -436,33 +437,37 @@ export function PublicRsvpView({
     });
   };
 
+  // QR Code Modal State
+  const [showQrModal, setShowQrModal] = useState<boolean>(false);
+
   const RSVP_BANK_CHANNELS = [
     {
       id: 'nequi',
       name: 'Nequi',
-      number: '313 410 7123',
-      rawNumber: '3134107123',
-      owner: 'Fabián Téllez (Mizpa FC)',
+      number: '312 357 8415',
+      rawNumber: '3123578415',
+      owner: 'Cesar Tellez',
       badge: '🟣 Nequi',
       color: 'border-fuchsia-500/40 bg-fuchsia-950/20 text-fuchsia-300',
     },
     {
       id: 'daviplata',
       name: 'Daviplata',
-      number: '313 410 7123',
-      rawNumber: '3134107123',
-      owner: 'Fabián Téllez',
+      number: '312 357 8415',
+      rawNumber: '3123578415',
+      owner: 'Cesar Tellez',
       badge: '🔴 Daviplata',
       color: 'border-red-500/40 bg-red-950/20 text-red-300',
     },
     {
-      id: 'bancolombia',
-      name: 'Bancolombia Ahorros',
-      number: '044-000000-00',
-      rawNumber: '04400000000',
-      owner: 'Mizpa FC / Fabián Téllez',
-      badge: '🟡 Bancolombia',
-      color: 'border-yellow-500/40 bg-yellow-950/20 text-yellow-300',
+      id: 'breb_qr',
+      name: 'Llave Bre-B / QR',
+      number: '@3123578415',
+      rawNumber: '@3123578415',
+      owner: 'Cesar Tellez (Bre-B / QR)',
+      badge: '⚡ Llave @ Bre-B / QR',
+      color: 'border-cyan-500/40 bg-cyan-950/20 text-cyan-300',
+      isQr: true,
     },
   ];
 
@@ -635,9 +640,19 @@ export function PublicRsvpView({
             <div className="space-y-4">
               {/* Bank quick copy buttons */}
               <div className="space-y-2">
-                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
-                  1. Cuentas oficiales de Mizpa FC (Toca para copiar):
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
+                    1. Cuentas oficiales (Toca para copiar):
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowQrModal(true)}
+                    className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-semibold bg-cyan-950/60 hover:bg-cyan-900/60 px-2.5 py-1 rounded-lg border border-cyan-500/40 transition-all"
+                  >
+                    <QrCode className="w-3.5 h-3.5" /> Ver Código QR 📷
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {RSVP_BANK_CHANNELS.map((ch) => {
                     const isCopied = copiedBankId === ch.id;
@@ -666,6 +681,57 @@ export function PublicRsvpView({
                   })}
                 </div>
               </div>
+
+              {/* QR Code Modal */}
+              {showQrModal && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                  <div className="bg-zinc-900 border border-cyan-500/40 rounded-3xl p-6 max-w-sm w-full space-y-4 text-center shadow-2xl relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowQrModal(false)}
+                      className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-full bg-zinc-800"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    <div className="space-y-1">
+                      <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-widest block">
+                        ⚡ Bre-B • Nequi
+                      </span>
+                      <h3 className="text-lg font-black text-white">Cesar Tellez</h3>
+                      <p className="text-xs font-mono text-zinc-300">Llave: <strong className="text-cyan-400">@3123578415</strong></p>
+                    </div>
+
+                    <div className="bg-white p-3 rounded-2xl inline-block shadow-inner mx-auto">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src="/images/qr-payment.jpg"
+                        alt="Código QR Bre-B Nequi Cesar Tellez @3123578415"
+                        className="w-56 h-auto rounded-xl object-contain mx-auto"
+                      />
+                    </div>
+
+                    <div className="pt-1 flex justify-center gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          handleCopyBank('@3123578415', 'modal_llave');
+                        }}
+                        className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs py-2 px-4 rounded-xl gap-1.5 shadow"
+                      >
+                        <Copy className="w-3.5 h-3.5" /> Copiar Llave @3123578415
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => setShowQrModal(false)}
+                        variant="outline"
+                        className="border-zinc-700 text-zinc-300 hover:text-white text-xs py-2 px-4 rounded-xl"
+                      >
+                        Cerrar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Receipt uploader with OCR */}
               <div className="space-y-2 pt-2 border-t border-zinc-800/80">
