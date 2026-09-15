@@ -11,6 +11,7 @@ import {
   settleMatchAction,
   createMatchAction,
   updateMatchAction,
+  reconcileMatchAttendancesAction,
   deleteMatchAction,
   openMatchRegistrationAction,
 } from '../../app/actions/match-actions.ts';
@@ -20,12 +21,18 @@ import {
   checkinAttendanceAction,
   updateAttendanceGuestTypeAction,
 } from '../../app/actions/rsvp-actions.ts';
-import type { Match, Attendance, Player, MatchStatus } from '../../core/domain/index.ts';
+import { recordPlayerCreditAction } from '../../app/actions/finance-actions.ts';
+import type { Match, Attendance, Player, MatchStatus, ConfirmedRosterEntry } from '../../core/domain/index.ts';
+import {
+  formatWhatsAppGroupCapacityMessage,
+  formatSecurityGateRosterMessage,
+} from '../../core/utils/capacity-formatters.ts';
 import {
   formatColombianPlate,
   formatPlateBadge,
   getVehicleIcon,
 } from '../../core/utils/plate-formatter.ts';
+import { copyToClipboard } from '../../core/utils/clipboard.ts';
 import {
   Calendar,
   MapPin,
@@ -121,6 +128,15 @@ export function MatchSettlementCard({
   const [selectedHostPlayerId, setSelectedHostPlayerId] = useState<string>(players[0]?.id || '');
   const [guestName, setGuestName] = useState<string>('');
   const [guestTypeForNewGuest, setGuestTypeForNewGuest] = useState<'PLAYER' | 'COMPANION'>('PLAYER');
+
+  // Modal for Live Roster & Gate Access Sheet Preview / Copy
+  const [showRosterShareModal, setShowRosterShareModal] = useState<boolean>(false);
+  const [rosterTab, setRosterTab] = useState<'whatsapp' | 'gate'>('whatsapp');
+
+  // Quick Cash Payment Modal State (For registering cash at the pitch)
+  const [cashModalPlayer, setCashModalPlayer] = useState<{ id: string; name: string; suggestedAmount: number } | null>(null);
+  const [cashAmount, setCashAmount] = useState<number>(10000);
+  const [cashNote, setCashNote] = useState<string>('');
 
   const isSettled = match ? match.status === 'SETTLED' : false;
   const durationHours = match?.durationHours ?? 2;
@@ -222,7 +238,21 @@ export function MatchSettlementCard({
         const updated = res.data;
         setMatch(updated);
         setMatches((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+        if (res.attendances) {
+          setAttendances(res.attendances);
+        }
         setShowEditModal(false);
+      }
+    });
+  };
+
+  const handleReconcileAttendances = () => {
+    if (!match) return;
+    startTransition(async () => {
+      const res = await reconcileMatchAttendancesAction(match.id);
+      setFeedback({ success: res.success, message: res.message });
+      if (res.success && res.data) {
+        setAttendances(res.data.allAttendances);
       }
     });
   };
@@ -365,13 +395,116 @@ export function MatchSettlementCard({
     });
   };
 
+  const handleRecordCashPayment = () => {
+    if (!cashModalPlayer || cashAmount <= 0) return;
+    startTransition(async () => {
+      const res = await recordPlayerCreditAction(
+        cashModalPlayer.id,
+        cashAmount,
+        cashNote.trim() || `Pago en efectivo cancha - ${match?.location || 'Partido'}`
+      );
+      setFeedback(res);
+      if (res.success) {
+        setCashModalPlayer(null);
+      }
+    });
+  };
+
   const getPlayer = (playerId: string) => players.find((p) => p.id === playerId);
 
   const vehicleList = attendances.filter(
     (a) => (a.hasVehicle || a.vehiclePlate) && a.status !== 'CANCELLED'
   );
 
-  const handleCopyParkingList = () => {
+  const buildLiveRosterEntries = (): ConfirmedRosterEntry[] => {
+    const confirmedAttendances = attendances
+      .filter((a) => a.status === 'CONFIRMED' || a.status === 'ATTENDED')
+      .sort((a, b) => new Date(a.registeredAt).getTime() - new Date(b.registeredAt).getTime());
+
+    return confirmedAttendances.map((att, idx) => {
+      const host = players.find((p) => p.id === att.playerId);
+      const isGuest = Boolean(att.guestName && att.guestName.trim().length > 0);
+      const fullName = isGuest ? att.guestName!.trim() : (host?.fullName || 'Jugador Registrado');
+      const documentId = isGuest ? undefined : host?.documentId;
+      const vehiclePlate = att.vehiclePlate;
+      const hasVehicle = att.hasVehicle ?? !!vehiclePlate;
+
+      return {
+        slotNumber: idx + 1,
+        playerId: att.playerId,
+        fullName,
+        documentId,
+        hasVehicle,
+        vehiclePlate,
+        isGuest,
+        guestName: att.guestName,
+        guestType: att.guestType || 'PLAYER',
+        hostPlayerName: isGuest ? host?.fullName : undefined,
+        registeredAt: new Date(att.registeredAt),
+      };
+    });
+  };
+
+  const getWhatsAppRosterText = () => {
+    if (!match) return '';
+    const roster = buildLiveRosterEntries();
+    const playingCount = roster.filter((r) => r.guestType !== 'COMPANION').length;
+    const dynamicEstFee = playingCount > 0 ? Math.ceil(match.pitchRentalCost / playingCount) : 0;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const rsvpUrl = `${origin}/rsvp/${match.id}`;
+
+    return formatWhatsAppGroupCapacityMessage({
+      matchId: match.id,
+      matchLocation: match.location,
+      matchLocationAddress: match.locationAddress,
+      matchDate: new Date(match.date),
+      googleMapsUrl: match.googleMapsUrl,
+      confirmedCount: roster.length,
+      totalCapacity: match.maxPlayers || 18,
+      remainingSpots: Math.max(0, (match.maxPlayers || 18) - playingCount),
+      roster,
+      rsvpUrl,
+      estFee: dynamicEstFee,
+    });
+  };
+
+  const getGateRosterText = () => {
+    if (!match) return '';
+    const roster = buildLiveRosterEntries();
+    return formatSecurityGateRosterMessage({
+      matchId: match.id,
+      matchLocation: match.location,
+      matchLocationAddress: match.locationAddress,
+      matchDate: new Date(match.date),
+      durationHours: match.durationHours || 2,
+      confirmedCount: roster.length,
+      roster,
+    });
+  };
+
+  const handleCopyWhatsAppRoster = async () => {
+    const text = getWhatsAppRosterText();
+    if (!text) return;
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setFeedback({ success: true, message: '📋 Nómina para Grupo de WhatsApp copiada al portapapeles.' });
+    } else {
+      setFeedback({ success: false, message: 'No se pudo copiar automáticamente. Puedes seleccionar el texto y copiarlo manualmente.' });
+    }
+  };
+
+  const handleCopyGateRoster = async () => {
+    const text = getGateRosterText();
+    if (!text) return;
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setFeedback({ success: true, message: '🏢 Planilla de Portería / Vigilancia copiada al portapapeles.' });
+    } else {
+      setFeedback({ success: false, message: 'No se pudo copiar automáticamente. Puedes seleccionar el texto y copiarlo manualmente.' });
+    }
+  };
+
+  const handleCopyParkingList = async () => {
     if (!match || vehicleList.length === 0) return;
     const formattedDate = new Date(match.date).toLocaleDateString('es-CO', {
       weekday: 'long',
@@ -388,8 +521,12 @@ export function MatchSettlementCard({
       return `${i + 1}. ${formattedBadge} — ${name}`;
     });
     const text = `🚗 *PLANILLA DE VEHÍCULOS / PARQUEADERO - MIZPA FC*\n📍 *Sede:* ${match.location}\n📅 *Fecha:* ${formattedDate}\n\n${lines.join('\n')}\n\nTotal autorizados: ${vehicleList.length} vehículos.`;
-    navigator.clipboard.writeText(text);
-    setFeedback({ success: true, message: 'Lista de parqueadero copiada al portapapeles para portería/vigilancia.' });
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setFeedback({ success: true, message: 'Lista de parqueadero copiada al portapapeles para portería/vigilancia.' });
+    } else {
+      setFeedback({ success: false, message: 'No se pudo copiar automáticamente. Puedes seleccionar el texto y copiarlo manualmente.' });
+    }
   };
 
   const getPlayerDisplayName = (player?: Player | null, fallbackId?: string) => {
@@ -533,6 +670,20 @@ export function MatchSettlementCard({
                 <span>Editar Partido</span>
               </Button>
 
+              {!isSettled && (
+                <Button
+                  onClick={handleReconcileAttendances}
+                  variant="outline"
+                  size="default"
+                  disabled={isPending}
+                  className="border-sky-500/30 bg-sky-950/20 hover:bg-sky-900/40 text-sky-300 hover:text-sky-100 hover:border-sky-500/60 shadow-sm hover:shadow-sky-500/10 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 text-xs sm:text-sm font-semibold rounded-lg px-3.5 py-2 flex items-center gap-2 group"
+                  title="Sincronizar cupos y promover lista de espera"
+                >
+                  <RefreshCw className={`w-4 h-4 text-sky-400 group-hover:rotate-180 transition-transform duration-500 ${isPending ? 'animate-spin' : ''}`} />
+                  <span>Sincronizar Cupos</span>
+                </Button>
+              )}
+
               <Button
                 onClick={() => setShowDeleteConfirm(true)}
                 variant="outline"
@@ -542,6 +693,16 @@ export function MatchSettlementCard({
               >
                 <Trash2 className="w-4 h-4 text-rose-400 group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-200" />
                 <span>Eliminar</span>
+              </Button>
+
+              <Button
+                onClick={() => setShowRosterShareModal(true)}
+                variant="outline"
+                size="default"
+                className="border-emerald-600/70 bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-300 gap-1.5 font-semibold text-xs sm:text-sm shadow-sm"
+                title="Copiar nómina actualizada para WhatsApp o planilla para Portería/Vigilancia"
+              >
+                <Share2 className="w-4 h-4 text-emerald-400" /> 📲 Copiar Nómina & Portería
               </Button>
 
               <Link href="/notifications">
@@ -1006,6 +1167,144 @@ export function MatchSettlementCard({
         </Card>
       )}
 
+      {/* Modal para Compartir Nómina WhatsApp y Planilla de Portería / Vigilancia */}
+      {showRosterShareModal && match && (
+        <Card className="border-emerald-500/60 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-2xl animate-in fade-in duration-200">
+          <CardHeader className="pb-3 border-b border-zinc-800 flex flex-row items-center justify-between">
+            <div className="space-y-1">
+              <CardTitle className="text-lg flex items-center gap-2 text-white">
+                <Share2 className="w-5 h-5 text-emerald-400" /> Nómina en Vivo y Planilla de Control
+              </CardTitle>
+              <CardDescription className="text-xs text-zinc-400">
+                Generación dinámica en tiempo real con cálculo de cuota prorrateada, lista de espera y control de acceso.
+              </CardDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowRosterShareModal(false)}
+              className="text-zinc-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </CardHeader>
+
+          <CardContent className="pt-4 space-y-4">
+            {/* Tabs Selector */}
+            <div className="flex border-b border-zinc-800 gap-2">
+              <button
+                type="button"
+                onClick={() => setRosterTab('whatsapp')}
+                className={`pb-2.5 px-4 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+                  rosterTab === 'whatsapp'
+                    ? 'border-emerald-500 text-emerald-400'
+                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <span>💬 Grupo WhatsApp (Deportivo)</span>
+                <Badge variant="outline" className="text-[10px] border-emerald-800 text-emerald-300">
+                  {confirmedCount}/{maxPlayers}
+                </Badge>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setRosterTab('gate')}
+                className={`pb-2.5 px-4 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+                  rosterTab === 'gate'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>🏢 Portería & Vigilancia (Acceso)</span>
+                <Badge variant="outline" className="text-[10px] border-blue-800 text-blue-300">
+                  {confirmedCount + companionCount} personas
+                </Badge>
+              </button>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-zinc-950/70 p-3 rounded-lg border border-zinc-800 text-xs">
+              <div>
+                <span className="text-zinc-400 block text-[11px]">⚽ Jugadores Cancha:</span>
+                <span className="text-emerald-400 font-bold font-mono text-sm">
+                  {confirmedCount} / {maxPlayers}
+                </span>
+              </div>
+              <div>
+                <span className="text-zinc-400 block text-[11px]">👥 Acompañantes:</span>
+                <span className="text-blue-400 font-bold font-mono text-sm">
+                  {companionCount}
+                </span>
+              </div>
+              <div>
+                <span className="text-zinc-400 block text-[11px]">💵 Cuota Dinámica:</span>
+                <span className="text-amber-400 font-bold font-mono text-sm">
+                  ${dynamicPitchFee.toLocaleString('es-CO')} COP
+                </span>
+              </div>
+              <div>
+                <span className="text-zinc-400 block text-[11px]">🚗 Vehículos / Placas:</span>
+                <span className="text-purple-400 font-bold font-mono text-sm">
+                  {vehicleList.length}
+                </span>
+              </div>
+            </div>
+
+            {/* Text Preview Box */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-zinc-400">
+                <span>Vista previa del mensaje generado en vivo:</span>
+                <span className="font-mono text-[11px]">
+                  {rosterTab === 'whatsapp' ? 'Formato WhatsApp' : 'Formato Portería'}
+                </span>
+              </div>
+
+              <pre className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs text-zinc-200 font-mono whitespace-pre-wrap max-h-72 overflow-y-auto leading-relaxed select-all">
+                {rosterTab === 'whatsapp' ? getWhatsAppRosterText() : getGateRosterText()}
+              </pre>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+              <p className="text-[11px] text-zinc-400">
+                {rosterTab === 'whatsapp'
+                  ? '💡 Incluye nómina numerada, acompañantes, cuota dinámica calculada y cupos restantes.'
+                  : '💡 Incluye cédulas, placas vehiculares registradas y conteo oficial para los guardas.'}
+              </p>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button
+                  onClick={rosterTab === 'whatsapp' ? handleCopyWhatsAppRoster : handleCopyGateRoster}
+                  size="sm"
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold gap-1.5 shadow-md"
+                >
+                  <Copy className="w-3.5 h-3.5" /> Copiar al Portapapeles
+                </Button>
+
+                {rosterTab === 'whatsapp' && (
+                  <a
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(getWhatsAppRosterText())}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex"
+                  >
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-emerald-700/60 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 text-xs gap-1.5 font-medium"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> Abrir en WhatsApp
+                    </Button>
+                  </a>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Status Feedback Banner */}
       {feedback && (
         <div
@@ -1099,9 +1398,23 @@ export function MatchSettlementCard({
                   <span>Vehículos Registrados:</span>
                   <span className="text-zinc-200 font-semibold">{vehicleList.length} vehículos 🚗</span>
                 </div>
-                <div className="flex justify-between py-1">
+                <div className="flex justify-between items-center py-1">
                   <span>Lista de Espera:</span>
-                  <span className="text-amber-400 font-semibold">{waitlistCount} en espera</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-400 font-semibold">{waitlistCount} en espera</span>
+                    {waitlistCount > 0 && confirmedCount < maxPlayers && !isSettled && (
+                      <button
+                        type="button"
+                        onClick={handleReconcileAttendances}
+                        disabled={isPending}
+                        className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-colors"
+                        title="Promover jugadores en espera automáticamente"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isPending ? 'animate-spin' : ''}`} />
+                        Promover ({Math.min(waitlistCount, maxPlayers - confirmedCount)})
+                      </button>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1157,14 +1470,34 @@ export function MatchSettlementCard({
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={handleCopyWhatsAppRoster}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs gap-1.5 border-emerald-700/60 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50"
+                  title="Copiar nómina deportiva completa para el grupo de WhatsApp"
+                >
+                  <Copy className="w-3.5 h-3.5 text-emerald-400" /> Copiar WhatsApp
+                </Button>
+                <Button
+                  onClick={handleCopyGateRoster}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs gap-1.5 border-blue-700/60 bg-blue-950/40 text-blue-300 hover:bg-blue-900/50"
+                  title="Copiar planilla formal para portería y vigilancia"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-blue-400" /> Copiar Portería
+                </Button>
+                <Button
+                  onClick={() => setShowRosterShareModal(true)}
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs gap-1.5 font-medium"
+                >
+                  <Share2 className="w-3.5 h-3.5" /> Vista Previa & Compartir
+                </Button>
                 <Link href={`/rsvp/${match.id}`} target="_blank">
-                  <Button variant="outline" size="sm" className="text-xs gap-1.5">
-                    <ExternalLink className="w-3.5 h-3.5" /> Abrir Formulario de Registro
-                  </Button>
-                </Link>
-                <Link href="/notifications">
-                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs gap-1.5">
-                    <Share2 className="w-3.5 h-3.5" /> Compartir en WhatsApp
+                  <Button variant="ghost" size="sm" className="text-xs gap-1 text-zinc-400 hover:text-white">
+                    <ExternalLink className="w-3.5 h-3.5" /> Ver RSVP
                   </Button>
                 </Link>
               </div>
@@ -1244,7 +1577,27 @@ export function MatchSettlementCard({
                 </CardDescription>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={handleCopyWhatsAppRoster}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-7 gap-1 border-zinc-700 hover:bg-zinc-800 text-emerald-300"
+                  title="Copiar nómina deportiva completa para el grupo de WhatsApp"
+                >
+                  <Copy className="w-3.5 h-3.5 text-emerald-400" />
+                  Nómina WhatsApp
+                </Button>
+                <Button
+                  onClick={handleCopyGateRoster}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-7 gap-1 border-zinc-700 hover:bg-zinc-800 text-blue-300"
+                  title="Copiar planilla formal para portería y vigilancia"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+                  Portería
+                </Button>
                 {vehicleList.length > 0 && (
                   <Button
                     onClick={handleCopyParkingList}
@@ -1254,7 +1607,7 @@ export function MatchSettlementCard({
                     title="Copiar lista de placas para la administración/portería"
                   >
                     <Car className="w-3.5 h-3.5 text-emerald-400" />
-                    Copiar Lista Vehículos ({vehicleList.length})
+                    Vehículos ({vehicleList.length})
                   </Button>
                 )}
                 <span className="text-xs font-mono text-zinc-400 bg-zinc-800 px-2 py-1 rounded">
@@ -1338,6 +1691,28 @@ export function MatchSettlementCard({
                             {!isSettled && (
                               <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                  {!isCancelled && (
+                                    <Button
+                                      onClick={() => {
+                                        const host = getPlayer(att.playerId);
+                                        const suggested = isAttended && playerFee > 0 ? playerFee : dynamicPitchFee;
+                                        setCashModalPlayer({
+                                          id: att.playerId,
+                                          name: host?.fullName || att.playerId,
+                                          suggestedAmount: suggested,
+                                        });
+                                        setCashAmount(suggested);
+                                        setCashNote(`Pago en efectivo cancha - ${match.location}`);
+                                      }}
+                                      disabled={isPending}
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-xs h-7 px-2 border-emerald-600/40 text-emerald-400 hover:bg-emerald-950/50"
+                                      title="Registrar pago recibido en efectivo en la cancha"
+                                    >
+                                      💵 Efectivo
+                                    </Button>
+                                  )}
                                   {att.guestName && !isCancelled && (
                                     <Button
                                       onClick={() => handleToggleGuestType(att.id, att.guestType)}
@@ -1496,6 +1871,74 @@ export function MatchSettlementCard({
             </CardContent>
           </Card>
         </>
+      )}
+
+      {/* Quick Cash Payment Modal */}
+      {cashModalPlayer && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-zinc-900 border border-emerald-500/40 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Registrar Efectivo</h3>
+                  <p className="text-xs text-zinc-400">{cashModalPlayer.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCashModalPlayer(null)}
+                className="text-zinc-400 hover:text-white p-1 rounded-full bg-zinc-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-zinc-400 block mb-1 font-semibold">Monto Recibido ($ COP):</label>
+                <input
+                  type="number"
+                  min="1000"
+                  step="1000"
+                  value={cashAmount}
+                  onChange={(e) => setCashAmount(Number(e.target.value))}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-base font-mono font-bold text-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="text-zinc-400 block mb-1 font-semibold">Concepto / Nota:</label>
+                <input
+                  type="text"
+                  value={cashNote}
+                  onChange={(e) => setCashNote(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-zinc-800">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setCashModalPlayer(null)}
+                className="flex-1 text-zinc-400"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                disabled={isPending || cashAmount <= 0}
+                onClick={handleRecordCashPayment}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-1"
+              >
+                {isPending ? 'Guardando...' : 'Confirmar 💵'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

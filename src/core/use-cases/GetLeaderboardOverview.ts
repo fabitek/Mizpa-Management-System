@@ -43,7 +43,7 @@ export class GetLeaderboardOverviewUseCase {
     this.getTopScorersUseCase = new GetTopScorersUseCase(goalRepository, attendanceRepository);
   }
 
-  async execute(allPlayerIds: string[]): Promise<LeaderboardOverview> {
+  async execute(allPlayerIds: string[] = []): Promise<LeaderboardOverview> {
     const topScorers = await this.getTopScorersUseCase.execute();
 
     const allMatches = await this.matchRepository.findAll();
@@ -53,8 +53,9 @@ export class GetLeaderboardOverviewUseCase {
 
     // 1. Attendance streaks and matches played per player
     const attendanceRankings: AttendanceRankingEntry[] = [];
+    const safePlayerIds = Array.isArray(allPlayerIds) ? allPlayerIds : [];
 
-    for (const playerId of allPlayerIds) {
+    for (const playerId of safePlayerIds) {
       const attendances = await this.attendanceRepository.findByPlayerId(playerId);
       const attendedMatchIds = new Set(
         attendances.filter((a) => a.status === 'ATTENDED').map((a) => a.matchId)

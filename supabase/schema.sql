@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS public.matches (
     settled_fee_per_player NUMERIC(12, 2) CHECK (settled_fee_per_player IS NULL OR settled_fee_per_player >= 0),
     status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'OPEN_REGISTRATION', 'PLAYED', 'SETTLED', 'CANCELLED')),
     mvp_player_id UUID REFERENCES public.players(id) ON DELETE SET NULL,
+    notification_sent_10_players BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

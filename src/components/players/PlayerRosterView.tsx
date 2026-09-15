@@ -662,13 +662,26 @@ export function PlayerRosterView({ initialPlayers, currentUserRole = 'ADMIN' }: 
                     type="text"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="Ej. 3001234567"
+                    placeholder="Ej. 3123578415"
                     className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
+                    Cédula / Documento de Identidad
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.documentId}
+                    onChange={(e) => setFormData({ ...formData, documentId: e.target.value })}
+                    placeholder="Ej. CC 1020304050"
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
                     Correo Electrónico (Gmail)
@@ -681,21 +694,21 @@ export function PlayerRosterView({ initialPlayers, currentUserRole = 'ADMIN' }: 
                     className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
-                    Rol en el Sistema
-                  </label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  >
-                    <option value="PLAYER">Jugador</option>
-                    <option value="CAPTAIN">Capitán</option>
-                    <option value="ADMIN">Administrador</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
+                  Rol en el Sistema
+                </label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="PLAYER">Jugador</option>
+                  <option value="CAPTAIN">Capitán</option>
+                  <option value="ADMIN">Administrador</option>
+                </select>
               </div>
 
               {showEditModal && (

@@ -6,6 +6,7 @@ import { Badge } from '../ui/badge.tsx';
 import { Button } from '../ui/button.tsx';
 import { ReceiptUploader } from './ReceiptUploader.tsx';
 import { recordPlayerCreditAction, getPlayerStatementAction } from '../../app/actions/finance-actions.ts';
+import { copyToClipboard } from '../../core/utils/clipboard.ts';
 import type { Player, ReceiptOcrResult } from '../../core/domain/types.ts';
 import {
   CreditCard,
@@ -96,8 +97,8 @@ export function PublicPlayerPaymentView({
       })
     : [];
 
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = async (text: string, id: string) => {
+    await copyToClipboard(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2500);
   };

@@ -55,38 +55,45 @@ export class SupabasePlayerRepository implements IPlayerRepository {
     player.id = validId;
     return {
       id: validId,
-      full_name: player.fullName,
-      document_id: player.documentId ?? null,
-      email: player.email,
-      phone: player.phone ?? null,
-      alias: player.alias ?? null,
+      full_name: player.fullName.trim(),
+      document_id: player.documentId && player.documentId.trim() ? player.documentId.trim() : null,
+      email: player.email.trim(),
+      phone: player.phone && player.phone.trim() ? player.phone.trim() : null,
+      alias: player.alias && player.alias.trim() ? player.alias.trim() : null,
       role: player.role,
       is_active: player.isActive,
-      created_at: player.createdAt.toISOString(),
+      created_at: player.createdAt ? player.createdAt.toISOString() : new Date().toISOString(),
     };
   }
 
   async findById(id: string): Promise<Player | null> {
-    if (!id || !UUID_REGEX.test(id)) {
-      return null;
-    }
+    if (!id) return null;
+
     try {
-      const { data, error } = await this.client
+      if (UUID_REGEX.test(id)) {
+        const { data, error } = await this.client
+          .from('players')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
+
+        if (!error && data) {
+          return this.mapRowToEntity(data as PlayerRow);
+        }
+      }
+
+      // If id was seed ID or not matched, try finding by email or document if known
+      const { data: allPlayers, error: allErr } = await this.client
         .from('players')
         .select('*')
-        .eq('id', id)
-        .maybeSingle();
+        .limit(100);
 
-      if (error) {
-        console.warn(`Supabase findById player warning for '${id}':`, error.message);
-        return null;
+      if (!allErr && allPlayers) {
+        const found = allPlayers.find((p: PlayerRow) => p.id === id);
+        if (found) return this.mapRowToEntity(found as PlayerRow);
       }
 
-      if (!data) {
-        return null;
-      }
-
-      return this.mapRowToEntity(data as PlayerRow);
+      return null;
     } catch (err) {
       console.warn(`Supabase findById player exception for '${id}':`, err);
       return null;
@@ -147,14 +154,56 @@ export class SupabasePlayerRepository implements IPlayerRepository {
   }
 
   async update(player: Player): Promise<void> {
-    const row = this.mapEntityToRow(player);
-    const { error } = await this.client
+    const updatePayload = {
+      full_name: player.fullName.trim(),
+      document_id: player.documentId && player.documentId.trim() ? player.documentId.trim() : null,
+      email: player.email.trim(),
+      phone: player.phone && player.phone.trim() ? player.phone.trim() : null,
+      alias: player.alias && player.alias.trim() ? player.alias.trim() : null,
+      role: player.role,
+      is_active: player.isActive,
+    };
+
+    // 1. Try updating by id
+    let { data, error } = await this.client
       .from('players')
-      .update(row)
-      .eq('id', player.id);
+      .update(updatePayload)
+      .eq('id', player.id)
+      .select();
 
     if (error) {
-      throw new Error(`Failed to update player '${player.id}': ${error.message}`);
+      console.warn(`Supabase update player error for id '${player.id}':`, error.message);
+    }
+
+    // 2. If no row updated by id, fallback to matching by email
+    if (!data || data.length === 0) {
+      if (player.email) {
+        const resByEmail = await this.client
+          .from('players')
+          .update(updatePayload)
+          .eq('email', player.email.trim())
+          .select();
+
+        if (resByEmail.data && resByEmail.data.length > 0) {
+          return;
+        }
+      }
+
+      // 3. Fallback to matching by document_id
+      if (player.documentId && player.documentId.trim()) {
+        const resByDoc = await this.client
+          .from('players')
+          .update(updatePayload)
+          .eq('document_id', player.documentId.trim())
+          .select();
+
+        if (resByDoc.data && resByDoc.data.length > 0) {
+          return;
+        }
+      }
+
+      // 4. If row doesn't exist in Supabase yet, save it
+      await this.save(player);
     }
   }
 }

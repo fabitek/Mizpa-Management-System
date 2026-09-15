@@ -45,6 +45,10 @@ export class InMemoryMatchRepository implements IMatchRepository {
     this.matches.set(match.id, { ...match });
   }
 
+  async delete(id: string): Promise<void> {
+    this.matches.delete(id);
+  }
+
   async findAll(): Promise<Match[]> {
     return Array.from(this.matches.values()).map((m) => ({ ...m }));
   }
@@ -84,6 +88,14 @@ export class InMemoryAttendanceRepository implements IAttendanceRepository {
       throw new Error(`Attendance with ID '${attendance.id}' not found.`);
     }
     this.attendances[index] = { ...attendance };
+  }
+
+  async delete(id: string): Promise<void> {
+    this.attendances = this.attendances.filter((a) => a.id !== id);
+  }
+
+  async deleteByMatchId(matchId: string): Promise<void> {
+    this.attendances = this.attendances.filter((a) => a.matchId !== matchId);
   }
 }
 

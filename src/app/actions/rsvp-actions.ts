@@ -7,6 +7,7 @@ import {
   checkinAttendanceUseCase,
   openMatchRegistrationUseCase,
   createPlayerUseCase,
+  checkAndNotifyCapacityReachedUseCase,
   playerRepository,
   attendanceRepository,
 } from '../../infrastructure/container.ts';
@@ -85,6 +86,15 @@ export async function registerAttendanceAction(
       ? `${displayName}${vehicleMsg} ingresó en LISTA DE ESPERA (Cupo lleno).`
       : `${displayName}${vehicleMsg} CONFIRMADO en cancha (${result.activeConfirmedCount}/${result.maxPlayers}).`;
 
+    // Automated 10-player capacity check trigger
+    try {
+      if (result.attendance.status === 'CONFIRMED') {
+        await checkAndNotifyCapacityReachedUseCase.execute({ matchId });
+      }
+    } catch (capacityErr) {
+      console.warn('Capacity trigger warning (non-blocking):', capacityErr);
+    }
+
     return {
       success: true,
       message: statusMsg,
@@ -132,6 +142,14 @@ export async function cancelAttendanceAction(
     let msg = 'Inscripción cancelada correctamente.';
     if (result.promotedAttendance) {
       msg += ` ¡Se promovió automáticamente a un jugador de la Lista de Espera a CONFIRMADO!`;
+      // Trigger automated 10-player capacity check if promotion completed 10 players
+      try {
+        await checkAndNotifyCapacityReachedUseCase.execute({
+          matchId: result.cancelledAttendance.matchId,
+        });
+      } catch (capacityErr) {
+        console.warn('Capacity promotion trigger warning (non-blocking):', capacityErr);
+      }
     }
 
     return {

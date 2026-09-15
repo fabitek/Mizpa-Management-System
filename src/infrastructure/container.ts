@@ -7,6 +7,7 @@ import type {
   IGoalRepository,
   IAuthService,
   INotificationService,
+  INotificationGateway,
 } from '../core/domain/index.ts';
 import { InMemoryMatchRepository } from './repositories/in-memory/InMemoryMatchRepository.ts';
 import { InMemoryPlayerRepository } from './repositories/in-memory/InMemoryPlayerRepository.ts';
@@ -16,6 +17,10 @@ import { InMemoryOperatingExpenseRepository } from './repositories/in-memory/InM
 import { InMemoryGoalRepository } from './repositories/in-memory/InMemoryGoalRepository.ts';
 import { InMemoryAuthService } from './repositories/in-memory/InMemoryAuthService.ts';
 import { InMemoryNotificationService } from './repositories/in-memory/InMemoryNotificationService.ts';
+import {
+  WhatsAppNotificationGateway,
+  InMemoryNotificationGateway,
+} from './adapters/whatsapp/index.ts';
 import {
   SupabaseMatchRepository,
   SupabasePlayerRepository,
@@ -54,6 +59,8 @@ import {
   SwitchSessionUserUseCase,
   UpdateMatchUseCase,
   DeleteMatchUseCase,
+  CheckAndNotifyCapacityReachedUseCase,
+  ReconcileMatchAttendancesUseCase,
 } from '../core/use-cases/index.ts';
 import { initialMatches, initialAttendances, initialGoals, initialNotifications, initialPlayers } from './seed-data.ts';
 
@@ -68,11 +75,13 @@ export interface DIContainer {
   goalRepository: IGoalRepository;
   authService: IAuthService;
   notificationService: INotificationService;
+  notificationGateway: INotificationGateway;
   createPlayerUseCase: CreatePlayerUseCase;
   settleMatchUseCase: SettleMatchUseCase;
   calculateMatchFeeUseCase: CalculateMatchFeeUseCase;
   createMatchUseCase: CreateMatchUseCase;
   updateMatchUseCase: UpdateMatchUseCase;
+  reconcileMatchAttendancesUseCase: ReconcileMatchAttendancesUseCase;
   deleteMatchUseCase: DeleteMatchUseCase;
   openMatchRegistrationUseCase: OpenMatchRegistrationUseCase;
   registerAttendanceUseCase: RegisterAttendanceUseCase;
@@ -97,6 +106,7 @@ export interface DIContainer {
   sendDebtReminderUseCase: SendDebtReminderUseCase;
   getNotificationsLogUseCase: GetNotificationsLogUseCase;
   switchSessionUserUseCase: SwitchSessionUserUseCase;
+  checkAndNotifyCapacityReachedUseCase: CheckAndNotifyCapacityReachedUseCase;
 }
 
 // Preserve singletons in development / serverless context
@@ -170,7 +180,11 @@ function createContainer(): DIContainer {
 
   const calculateMatchFeeUseCase = new CalculateMatchFeeUseCase();
   const createMatchUseCase = new CreateMatchUseCase(matchRepository);
-  const updateMatchUseCase = new UpdateMatchUseCase(matchRepository);
+  const updateMatchUseCase = new UpdateMatchUseCase(matchRepository, attendanceRepository);
+  const reconcileMatchAttendancesUseCase = new ReconcileMatchAttendancesUseCase(
+    matchRepository,
+    attendanceRepository
+  );
   const deleteMatchUseCase = new DeleteMatchUseCase(matchRepository, attendanceRepository);
   const openMatchRegistrationUseCase = new OpenMatchRegistrationUseCase(matchRepository);
   const registerAttendanceUseCase = new RegisterAttendanceUseCase(
@@ -235,6 +249,15 @@ function createContainer(): DIContainer {
   const getNotificationsLogUseCase = new GetNotificationsLogUseCase(notificationService);
   const switchSessionUserUseCase = new SwitchSessionUserUseCase(authService);
 
+  const notificationGateway = new WhatsAppNotificationGateway();
+  const checkAndNotifyCapacityReachedUseCase = new CheckAndNotifyCapacityReachedUseCase(
+    matchRepository,
+    attendanceRepository,
+    playerRepository,
+    notificationGateway,
+    notificationService
+  );
+
   return {
     dataSource: activeDataSource,
     matchRepository,
@@ -245,11 +268,13 @@ function createContainer(): DIContainer {
     goalRepository,
     authService,
     notificationService,
+    notificationGateway,
     createPlayerUseCase,
     settleMatchUseCase,
     calculateMatchFeeUseCase,
     createMatchUseCase,
     updateMatchUseCase,
+    reconcileMatchAttendancesUseCase,
     deleteMatchUseCase,
     openMatchRegistrationUseCase,
     registerAttendanceUseCase,
@@ -273,6 +298,7 @@ function createContainer(): DIContainer {
     sendDebtReminderUseCase,
     getNotificationsLogUseCase,
     switchSessionUserUseCase,
+    checkAndNotifyCapacityReachedUseCase,
   };
 }
 
@@ -288,11 +314,13 @@ export const {
   goalRepository,
   authService,
   notificationService,
+  notificationGateway,
   createPlayerUseCase,
   settleMatchUseCase,
   calculateMatchFeeUseCase,
   createMatchUseCase,
   updateMatchUseCase,
+  reconcileMatchAttendancesUseCase,
   deleteMatchUseCase,
   openMatchRegistrationUseCase,
   registerAttendanceUseCase,
@@ -316,5 +344,8 @@ export const {
   sendDebtReminderUseCase,
   getNotificationsLogUseCase,
   switchSessionUserUseCase,
+  checkAndNotifyCapacityReachedUseCase,
 } = container;
+
+
 

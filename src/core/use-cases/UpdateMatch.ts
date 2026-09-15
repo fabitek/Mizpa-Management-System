@@ -1,4 +1,10 @@
-import type { Match, IMatchRepository, MatchStatus } from '../domain/index.ts';
+import type {
+  Match,
+  IMatchRepository,
+  IAttendanceRepository,
+  Attendance,
+  MatchStatus,
+} from '../domain/index.ts';
 
 export interface UpdateMatchInput {
   id: string;
@@ -14,14 +20,25 @@ export interface UpdateMatchInput {
   status?: MatchStatus;
 }
 
+export interface UpdateMatchResult {
+  match: Match;
+  promotedAttendances: Attendance[];
+  allAttendances: Attendance[];
+}
+
 export class UpdateMatchUseCase {
   private readonly matchRepository: IMatchRepository;
+  private readonly attendanceRepository?: IAttendanceRepository;
 
-  constructor(matchRepository: IMatchRepository) {
+  constructor(
+    matchRepository: IMatchRepository,
+    attendanceRepository?: IAttendanceRepository
+  ) {
     this.matchRepository = matchRepository;
+    this.attendanceRepository = attendanceRepository;
   }
 
-  async execute(input: UpdateMatchInput): Promise<Match> {
+  async execute(input: UpdateMatchInput): Promise<UpdateMatchResult> {
     const existing = await this.matchRepository.findById(input.id);
     if (!existing) {
       throw new Error(`Match with ID '${input.id}' not found.`);
@@ -77,6 +94,46 @@ export class UpdateMatchUseCase {
 
     await this.matchRepository.update(updatedMatch);
 
-    return updatedMatch;
+    const promotedAttendances: Attendance[] = [];
+    let allAttendances: Attendance[] = [];
+
+    // Reconciliar lista de espera si la capacidad aumentó o si hay cupos disponibles
+    if (this.attendanceRepository) {
+      const matchAttendances = await this.attendanceRepository.findByMatchId(updatedMatch.id);
+
+      // Solo los jugadores en cancha (no acompañantes) ocupan cupo de maxPlayers
+      const confirmedPlayingCount = matchAttendances.filter(
+        (a) => (a.status === 'CONFIRMED' || a.status === 'ATTENDED') && a.guestType !== 'COMPANION'
+      ).length;
+
+      const availableSpots = Math.max(0, updatedMatch.maxPlayers - confirmedPlayingCount);
+
+      if (availableSpots > 0) {
+        // Buscar jugadores en lista de espera ordenados por fecha de registro (FIFO)
+        const waitlist = matchAttendances
+          .filter((a) => a.status === 'WAITLIST')
+          .sort((a, b) => a.registeredAt.getTime() - b.registeredAt.getTime());
+
+        const toPromote = waitlist.slice(0, availableSpots);
+
+        for (const waitingAtt of toPromote) {
+          const promoted: Attendance = {
+            ...waitingAtt,
+            status: 'CONFIRMED',
+          };
+          await this.attendanceRepository.update(promoted);
+          promotedAttendances.push(promoted);
+        }
+      }
+
+      // Obtener lista final actualizada
+      allAttendances = await this.attendanceRepository.findByMatchId(updatedMatch.id);
+    }
+
+    return {
+      match: updatedMatch,
+      promotedAttendances,
+      allAttendances,
+    };
   }
 }

@@ -26,4 +26,7 @@ export * from './RecordOperatingExpense.ts';
 export * from './GetAllOperatingExpenses.ts';
 export * from './DeleteOperatingExpense.ts';
 export * from './ProcessReceiptOcr.ts';
+export * from './CheckAndNotifyCapacityReached.ts';
+export * from './ReconcileMatchAttendances.ts';
+export * from '../utils/capacity-formatters.ts';
 

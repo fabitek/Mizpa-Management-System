@@ -1,5 +1,10 @@
 import { notFound } from 'next/navigation';
-import { matchRepository, attendanceRepository, playerRepository } from '../../../infrastructure/container.ts';
+import {
+  matchRepository,
+  attendanceRepository,
+  playerRepository,
+  reconcileMatchAttendancesUseCase,
+} from '../../../infrastructure/container.ts';
 import { initialPlayers, initialMatch } from '../../../infrastructure/seed-data.ts';
 import { PublicRsvpView } from '../../../components/rsvp/PublicRsvpView.tsx';
 
@@ -47,9 +52,15 @@ export default async function RsvpPage({ params }: RsvpPageProps) {
 
   let attendances: any[] = [];
   try {
-    attendances = await attendanceRepository.findByMatchId(match.id);
+    const reconciled = await reconcileMatchAttendancesUseCase.execute(match.id);
+    attendances = reconciled.allAttendances;
   } catch (err) {
-    console.warn('RsvpPage attendances warning:', err);
+    console.warn('RsvpPage attendances auto-reconcile warning:', err);
+    try {
+      attendances = await attendanceRepository.findByMatchId(match.id);
+    } catch (attErr) {
+      console.warn('RsvpPage attendances warning:', attErr);
+    }
   }
 
   let playersList = initialPlayers;

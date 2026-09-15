@@ -18,6 +18,7 @@ import {
   Crown,
   LogOut,
   Users,
+  CreditCard,
 } from 'lucide-react';
 import { createClient } from '../../lib/supabase/client.ts';
 import { useRouter } from 'next/navigation';
@@ -73,6 +74,7 @@ export function AppHeader({
     { href: '/matches', label: 'Partidos', icon: Calendar },
     { href: '/players', label: 'Nómina', icon: Users },
     { href: '/wallet', label: 'Billetera', icon: Wallet },
+    { href: '/pago', label: 'Portal Pagos', icon: CreditCard },
     { href: '/stats', label: 'Estadísticas', icon: Trophy },
     { href: '/notifications', label: 'Notificaciones', icon: Bell },
   ];

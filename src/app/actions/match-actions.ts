@@ -5,6 +5,7 @@ import {
   settleMatchUseCase,
   createMatchUseCase,
   updateMatchUseCase,
+  reconcileMatchAttendancesUseCase,
   deleteMatchUseCase,
   openMatchRegistrationUseCase,
   matchRepository,
@@ -15,6 +16,7 @@ import {
   InvalidFinancialAmountError,
   type Match,
   type MatchStatus,
+  type Attendance,
 } from '../../core/domain/index.ts';
 
 export interface SettleMatchActionResult {
@@ -35,6 +37,29 @@ export interface CreateMatchActionResult {
   message: string;
   data?: Match;
   errorCode?: string;
+}
+
+export interface UpdateMatchActionResult {
+  success: boolean;
+  message: string;
+  data?: Match;
+  promotedCount?: number;
+  promotedAttendances?: Attendance[];
+  attendances?: Attendance[];
+}
+
+export interface ReconcileMatchActionResult {
+  success: boolean;
+  message: string;
+  data?: {
+    match: Match;
+    promotedCount: number;
+    promotedAttendances: Attendance[];
+    activeConfirmedCount: number;
+    waitlistCount: number;
+    maxPlayers: number;
+    allAttendances: Attendance[];
+  };
 }
 
 export async function settleMatchAction(
@@ -206,7 +231,7 @@ export async function updateMatchAction(input: {
   parkingFeePerHour?: number;
   maxPlayers?: number;
   status?: MatchStatus;
-}): Promise<{ success: boolean; message: string; data?: Match }> {
+}): Promise<UpdateMatchActionResult> {
   try {
     let parsedDate: Date | undefined;
     if (input.date) {
@@ -219,7 +244,7 @@ export async function updateMatchAction(input: {
       }
     }
 
-    const updated = await updateMatchUseCase.execute({
+    const { match, promotedAttendances, allAttendances } = await updateMatchUseCase.execute({
       id: input.id,
       location: input.location,
       locationAddress: input.locationAddress,
@@ -237,15 +262,54 @@ export async function updateMatchAction(input: {
     revalidatePath('/notifications');
     revalidatePath(`/rsvp/${input.id}`);
 
+    const promoMsg =
+      promotedAttendances.length > 0
+        ? ` Se promovieron automáticamente ${promotedAttendances.length} jugador(es) de lista de espera a CONFIRMADOS.`
+        : '';
+
     return {
       success: true,
-      message: `Convocatoria en ${updated.location} actualizada correctamente.`,
-      data: updated,
+      message: `Convocatoria en ${match.location} actualizada correctamente.${promoMsg}`,
+      data: match,
+      promotedCount: promotedAttendances.length,
+      promotedAttendances,
+      attendances: allAttendances,
     };
   } catch (error) {
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Error al actualizar la convocatoria.',
+    };
+  }
+}
+
+export async function reconcileMatchAttendancesAction(
+  matchId: string
+): Promise<ReconcileMatchActionResult> {
+  try {
+    const result = await reconcileMatchAttendancesUseCase.execute(matchId);
+
+    revalidatePath('/matches');
+    revalidatePath('/notifications');
+    revalidatePath(`/rsvp/${matchId}`);
+
+    const msg =
+      result.promotedCount > 0
+        ? `Sincronización exitosa: ${result.promotedCount} jugador(es) promovidos de lista de espera a CONFIRMADOS.`
+        : 'Cupos y lista de espera sincronizados. No hay jugadores pendientes por promover.';
+
+    return {
+      success: true,
+      message: msg,
+      data: result,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : 'Error al sincronizar lista de espera del partido.',
     };
   }
 }

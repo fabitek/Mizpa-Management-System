@@ -12,9 +12,11 @@ import {
   sendSettlementAlertsAction,
   sendDebtReminderAction,
   getNotificationsLogAction,
+  checkAndNotifyCapacityReachedAction,
 } from '../../app/actions/notification-actions.ts';
+import { copyToClipboard as safeCopyToClipboard } from '../../core/utils/clipboard.ts';
 import { deleteMatchAction } from '../../app/actions/match-actions.ts';
-import type { Player, Match, NotificationMessage } from '../../core/domain/types.ts';
+import type { Player, Match, NotificationMessage, CheckAndNotifyCapacityResult } from '../../core/domain/types.ts';
 import {
   Bell,
   MessageSquare,
@@ -34,6 +36,10 @@ import {
   Edit2,
   Trash2,
   PlusCircle,
+  ShieldCheck,
+  FileText,
+  Flame,
+  Check,
 } from 'lucide-react';
 
 interface NotificationsViewProps {
@@ -49,8 +55,9 @@ export function NotificationsView({
   activeMatch,
   initialNotifications,
 }: NotificationsViewProps) {
-  const [activeTab, setActiveTab] = useState<'group-convocation' | 'direct' | 'history'>('group-convocation');
+  const [activeTab, setActiveTab] = useState<'group-convocation' | 'quorum-10' | 'direct' | 'history'>('group-convocation');
   const [notifications, setNotifications] = useState<NotificationMessage[]>(initialNotifications);
+  const [quorumResult, setQuorumResult] = useState<CheckAndNotifyCapacityResult | null>(null);
 
   const [matchList, setMatchList] = useState<Match[]>(
     matches && matches.length > 0 ? matches : activeMatch ? [activeMatch] : []
@@ -78,6 +85,23 @@ export function NotificationsView({
         setMatchList(remaining);
         setSelectedMatchId(remaining.length > 0 ? remaining[0].id : '');
         setShowDeleteMatchDialog(false);
+      }
+    });
+  };
+
+  const handleTriggerQuorumCheck = (force = false) => {
+    if (!currentMatch) return;
+    startTransition(async () => {
+      const res = await checkAndNotifyCapacityReachedAction(currentMatch.id, force, baseDomain);
+      setFeedback({ success: res.success, message: res.message });
+      if (res.data) {
+        setQuorumResult(res.data);
+        if (res.data.triggered) {
+          const logsRes = await getNotificationsLogAction();
+          if (logsRes.success && logsRes.data) {
+            setNotifications(logsRes.data);
+          }
+        }
       }
     });
   };
@@ -253,9 +277,22 @@ export function NotificationsView({
     window.open(url, '_blank');
   };
 
-  const copyToClipboard = (text: string, successMsg = 'Copiado al portapapeles.') => {
-    navigator.clipboard.writeText(text);
-    setFeedback({ success: true, message: successMsg });
+  const openWhatsAppWithMessage = (phone: string, text: string) => {
+    const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
+    const encoded = encodeURIComponent(text);
+    const url = cleanPhone
+      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encoded}`
+      : `https://api.whatsapp.com/send?text=${encoded}`;
+    window.open(url, '_blank');
+  };
+
+  const copyToClipboard = async (text: string, successMsg = 'Copiado al portapapeles.') => {
+    const ok = await safeCopyToClipboard(text);
+    if (ok) {
+      setFeedback({ success: true, message: successMsg });
+    } else {
+      setFeedback({ success: false, message: 'No se pudo copiar automáticamente.' });
+    }
   };
 
   return (
@@ -345,7 +382,15 @@ export function NotificationsView({
           onClick={() => setActiveTab('group-convocation')}
           className="gap-2"
         >
-          <Share2 className="w-4 h-4 text-emerald-400" /> 1. Convocatoria de Grupo (Un Solo Link)
+          <Share2 className="w-4 h-4 text-emerald-400" /> 1. Convocatoria Inicial (Un Solo Link)
+        </Button>
+        <Button
+          variant={activeTab === 'quorum-10' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setActiveTab('quorum-10')}
+          className="gap-2"
+        >
+          <ShieldCheck className="w-4 h-4 text-cyan-400" /> 2. Quórum 10 & Portería
         </Button>
         <Button
           variant={activeTab === 'direct' ? 'default' : 'ghost'}
@@ -353,7 +398,7 @@ export function NotificationsView({
           onClick={() => setActiveTab('direct')}
           className="gap-2"
         >
-          <DollarSign className="w-4 h-4 text-amber-400" /> 2. Cobros & Recordatorios 1-a-1
+          <DollarSign className="w-4 h-4 text-amber-400" /> 3. Cobros & Recordatorios 1-a-1
         </Button>
         <Button
           variant={activeTab === 'history' ? 'default' : 'ghost'}
@@ -361,7 +406,7 @@ export function NotificationsView({
           onClick={() => setActiveTab('history')}
           className="gap-2"
         >
-          <Clock className="w-4 h-4" /> 3. Historial & Auditoría ({notifications.length})
+          <Clock className="w-4 h-4" /> 4. Historial & Auditoría ({notifications.length})
         </Button>
       </div>
 
@@ -561,7 +606,191 @@ export function NotificationsView({
         </div>
       )}
 
-      {/* Tab 2: 1-to-1 Fees & Debtors */}
+      {/* Tab 2: Quórum 10 & Planilla de Portería */}
+      {activeTab === 'quorum-10' && (
+        <div className="space-y-6">
+          <Card className="border-cyan-800/40 bg-gradient-to-b from-cyan-950/20 to-zinc-900/60 shadow-xl">
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-lg flex items-center gap-2 text-white">
+                  <ShieldCheck className="w-5 h-5 text-cyan-400" />
+                  Automatización de Quórum (10 Confirmados) & Control de Acceso
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  {currentMatch?.notificationSent10Players ? (
+                    <Badge variant="success" className="font-mono text-xs">
+                      ✅ Notificación Despachada
+                    </Badge>
+                  ) : (
+                    <Badge variant="warning" className="font-mono text-xs">
+                      ⏳ En Espera de Quórum
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <CardDescription className="text-xs text-zinc-300">
+                Al confirmarse el jugador #10 (o promoverse de lista de espera), el sistema genera y despacha automáticamente dos formatos: el <strong>anuncio de partido confirmado</strong> para el grupo de WhatsApp y la <strong>planilla formal con cédulas y placas</strong> para la portería de la sede.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {/* Match Selector */}
+              {matchList && matchList.length > 0 && (
+                <div className="p-3 bg-zinc-950/60 rounded-xl border border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+                    <label className="text-xs text-cyan-400 font-semibold flex items-center gap-1.5 shrink-0">
+                      <Calendar className="w-4 h-4" /> Seleccionar Partido:
+                    </label>
+                    <select
+                      value={selectedMatchId}
+                      onChange={(e) => setSelectedMatchId(e.target.value)}
+                      className="w-full sm:w-auto bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 font-medium"
+                    >
+                      {matchList.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.location} — {new Date(m.date).toLocaleDateString('es-CO', { timeZone: 'America/Bogota', weekday: 'short', month: 'short', day: 'numeric' })} {m.notificationSent10Players ? '(Quórum Notificado)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      onClick={() => handleTriggerQuorumCheck(false)}
+                      disabled={isPending || !currentMatch}
+                      size="sm"
+                      className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs gap-1.5 shadow-md"
+                    >
+                      <Flame className="w-3.5 h-3.5" />
+                      {isPending ? 'Verificando...' : 'Comprobar Quórum'}
+                    </Button>
+                    <Button
+                      onClick={() => handleTriggerQuorumCheck(true)}
+                      disabled={isPending || !currentMatch}
+                      variant="outline"
+                      size="sm"
+                      className="border-zinc-700 text-zinc-300 hover:text-white text-xs gap-1.5"
+                    >
+                      <Send className="w-3.5 h-3.5 text-cyan-400" />
+                      Forzar Reenvío
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* 2 Format Panels */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Format 1: WhatsApp Group Message */}
+                <div className="space-y-3 bg-zinc-950/80 p-4 rounded-xl border border-zinc-800 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h3 className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+                        <Share2 className="w-3.5 h-3.5" /> 1. Formato WhatsApp Grupo
+                      </h3>
+                      <Badge variant="outline" className="text-[10px] text-zinc-400">
+                        Deportivo & Directo
+                      </Badge>
+                    </div>
+                    <div className="bg-zinc-900/90 p-3 rounded-lg border border-zinc-800 text-xs font-mono text-zinc-200 whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto">
+                      {quorumResult?.groupMessage || (
+                        <div className="text-zinc-400 text-xs space-y-2 py-4 text-center">
+                          <p>🔥 *¡QUÓRUM ALCANZADO (10/18)! PARTIDO CONFIRMADO* ⚽</p>
+                          <p className="text-[11px] text-zinc-400">
+                            (Haz clic en <em>&quot;Comprobar Quórum&quot;</em> para generar la nómina en vivo con los primeros 10 confirmados y cupos restantes).
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-zinc-800/80">
+                    <Button
+                      onClick={() => {
+                        if (quorumResult?.groupMessage) {
+                          openWhatsAppWithMessage('', quorumResult.groupMessage);
+                        } else {
+                          copyToClipboard('Mensaje de quórum pendiente');
+                        }
+                      }}
+                      disabled={!quorumResult?.groupMessage}
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs gap-1.5"
+                    >
+                      <Share2 className="w-3.5 h-3.5" /> Enviar a WhatsApp
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        if (quorumResult?.groupMessage) {
+                          copyToClipboard(quorumResult.groupMessage, '¡Mensaje de quórum copiado!');
+                        }
+                      }}
+                      disabled={!quorumResult?.groupMessage}
+                      variant="outline"
+                      size="sm"
+                      className="border-zinc-700 text-zinc-300 hover:text-white text-xs gap-1.5"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Copiar Formato
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Format 2: Security Gate Access Sheet */}
+                <div className="space-y-3 bg-zinc-950/80 p-4 rounded-xl border border-zinc-800 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h3 className="text-xs font-semibold text-cyan-400 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5" /> 2. Formato Portería / Vigilancia
+                      </h3>
+                      <Badge variant="outline" className="text-[10px] text-zinc-400">
+                        Formal • Cédulas & Placas
+                      </Badge>
+                    </div>
+                    <div className="bg-zinc-900/90 p-3 rounded-lg border border-zinc-800 text-xs font-mono text-zinc-200 whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto">
+                      {quorumResult?.gateMessage || (
+                        <div className="text-zinc-400 text-xs space-y-2 py-4 text-center">
+                          <p>📋 *PLANILLA DE INGRESO Y PORTERÍA - MIZPA FC*</p>
+                          <p className="text-[11px] text-zinc-400">
+                            (Incluye Nombres completos, Cédulas y Placas vehiculares tabuladas formalmente para los vigilantes de la sede).
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-zinc-800/80">
+                    <Button
+                      onClick={() => {
+                        if (quorumResult?.gateMessage) {
+                          openWhatsAppWithMessage('', quorumResult.gateMessage);
+                        }
+                      }}
+                      disabled={!quorumResult?.gateMessage}
+                      size="sm"
+                      className="bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs gap-1.5"
+                    >
+                      <Share2 className="w-3.5 h-3.5" /> Enviar a Portería
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        if (quorumResult?.gateMessage) {
+                          copyToClipboard(quorumResult.gateMessage, '¡Planilla de portería copiada!');
+                        }
+                      }}
+                      disabled={!quorumResult?.gateMessage}
+                      variant="outline"
+                      size="sm"
+                      className="border-zinc-700 text-zinc-300 hover:text-white text-xs gap-1.5"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Copiar Planilla
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Tab 3: 1-to-1 Fees & Debtors */}
       {activeTab === 'direct' && (
         <div className="space-y-6">
           {/* Target Player Selector */}

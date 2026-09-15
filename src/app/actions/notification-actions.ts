@@ -6,9 +6,10 @@ import {
   sendSettlementAlertsUseCase,
   sendDebtReminderUseCase,
   getNotificationsLogUseCase,
+  checkAndNotifyCapacityReachedUseCase,
   notificationService,
 } from '../../infrastructure/container.ts';
-import type { NotificationMessage } from '../../core/domain/types.ts';
+import type { NotificationMessage, CheckAndNotifyCapacityResult } from '../../core/domain/types.ts';
 
 export interface NotificationActionResult<T = unknown> {
   success: boolean;
@@ -158,3 +159,44 @@ export async function generateWhatsAppLinkAction(
 ): Promise<string> {
   return notificationService.generateWhatsAppLink(phone, messageText);
 }
+
+export async function checkAndNotifyCapacityReachedAction(
+  matchId: string,
+  force?: boolean,
+  baseUrl?: string
+): Promise<NotificationActionResult<CheckAndNotifyCapacityResult>> {
+  try {
+    const result = await checkAndNotifyCapacityReachedUseCase.execute({
+      matchId,
+      force,
+      baseUrl,
+    });
+
+    if (result.triggered) {
+      revalidatePath('/notifications');
+      revalidatePath('/matches');
+      revalidatePath(`/rsvp/${matchId}`);
+    }
+
+    const message = result.triggered
+      ? '¡Quórum de 10 jugadores alcanzado! Notificaciones de WhatsApp y Portería despachadas.'
+      : result.reason === 'ALREADY_SENT'
+      ? 'La notificación de quórum (10 jugadores) ya había sido enviada previamente.'
+      : `El partido cuenta con ${result.confirmedCount} confirmados (se requieren 10 para disparar).`;
+
+    return {
+      success: true,
+      message,
+      data: result,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : 'Error al verificar quórum de 10 jugadores.',
+    };
+  }
+}
+

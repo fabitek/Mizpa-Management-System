@@ -29,6 +29,7 @@ export interface Match {
   settledFeePerPlayer: number | null;
   status: MatchStatus;
   mvpPlayerId?: string | null;
+  notificationSent10Players?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -140,7 +141,8 @@ export type NotificationType =
   | 'RSVP_CONFIRMATION'
   | 'WAITLIST_PROMOTION'
   | 'MATCH_SETTLED_FEE'
-  | 'DEBT_REMINDER';
+  | 'DEBT_REMINDER'
+  | 'CAPACITY_REACHED_10';
 
 export interface NotificationMessage {
   id: string;
@@ -155,6 +157,66 @@ export interface NotificationMessage {
   status: 'PENDING' | 'SENT' | 'FAILED';
   sentAt?: Date;
   createdAt: Date;
+}
+
+export interface ConfirmedRosterEntry {
+  slotNumber: number;
+  playerId: string;
+  fullName: string;
+  documentId?: string;
+  hasVehicle?: boolean;
+  vehiclePlate?: string;
+  isGuest: boolean;
+  guestName?: string;
+  guestType?: 'PLAYER' | 'COMPANION';
+  hostPlayerName?: string;
+  registeredAt: Date;
+}
+
+export interface WhatsAppGroupMessagePayload {
+  matchId: string;
+  matchLocation: string;
+  matchLocationAddress?: string;
+  matchDate: Date;
+  googleMapsUrl?: string;
+  confirmedCount: number;
+  totalCapacity: number;
+  remainingSpots: number;
+  roster: ConfirmedRosterEntry[];
+  rsvpUrl?: string;
+  recipient?: string;
+  estFee?: number;
+}
+
+export interface SecurityGateRosterPayload {
+  matchId: string;
+  matchLocation: string;
+  matchLocationAddress?: string;
+  matchDate: Date;
+  durationHours?: number;
+  confirmedCount: number;
+  roster: ConfirmedRosterEntry[];
+  recipient?: string;
+}
+
+export interface NotificationGatewayResult {
+  success: boolean;
+  messageId?: string;
+  provider: string;
+  recipient?: string;
+  error?: string;
+  timestamp: Date;
+}
+
+export interface CheckAndNotifyCapacityResult {
+  triggered: boolean;
+  matchId: string;
+  confirmedCount: number;
+  reason?: 'ALREADY_SENT' | 'CAPACITY_NOT_10' | 'NOTIFICATION_SENT';
+  groupMessage?: string;
+  gateMessage?: string;
+  groupResult?: NotificationGatewayResult;
+  gateResult?: NotificationGatewayResult;
 }
 
 export type ExpenseCategory =
