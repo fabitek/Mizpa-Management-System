@@ -15,6 +15,7 @@ import {
   formatPlateBadge,
   getVehicleIcon,
 } from '../../core/utils/plate-formatter.ts';
+import { copyToClipboard } from '../../core/utils/clipboard.ts';
 import type { Match, Attendance, Player, ReceiptOcrResult } from '../../core/domain/types.ts';
 import {
   Calendar,
@@ -67,15 +68,30 @@ export function PublicRsvpView({
 
   // Match details modal / drawer
   const [showMatchDetails, setShowMatchDetails] = useState<boolean>(false);
+  const [showRosterModal, setShowRosterModal] = useState<boolean>(false);
 
-  // Find players not yet registered
-  const registeredPlayerIds = new Set(
-    attendances
-      .filter((a) => a.status === 'CONFIRMED' || a.status === 'WAITLIST' || a.status === 'ATTENDED')
-      .map((a) => a.playerId)
-  );
+  // Find players already registered in the match (matching by ID, documentId, or email)
+  const registeredPlayerIds = new Set<string>();
+  const registeredDocumentIds = new Set<string>();
+  const registeredEmails = new Set<string>();
 
-  const availablePlayers = players.filter((p) => !registeredPlayerIds.has(p.id));
+  attendances
+    .filter((a) => (a.status === 'CONFIRMED' || a.status === 'WAITLIST' || a.status === 'ATTENDED') && !a.guestName)
+    .forEach((a) => {
+      registeredPlayerIds.add(a.playerId);
+      const host = players.find((p) => p.id === a.playerId);
+      if (host?.documentId) registeredDocumentIds.add(host.documentId.trim().toLowerCase());
+      if (host?.email) registeredEmails.add(host.email.trim().toLowerCase());
+    });
+
+  const isPlayerRegistered = (p: Player): boolean => {
+    if (registeredPlayerIds.has(p.id)) return true;
+    if (p.documentId && registeredDocumentIds.has(p.documentId.trim().toLowerCase())) return true;
+    if (p.email && registeredEmails.has(p.email.trim().toLowerCase())) return true;
+    return false;
+  };
+
+  const availablePlayers = players.filter((p) => !isPlayerRegistered(p));
 
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>(
     availablePlayers[0]?.id || players[0]?.id || ''
@@ -136,13 +152,15 @@ export function PublicRsvpView({
   const parkingFeePerHour = match.parkingFeePerHour ?? 1000;
   const parkingFee = durationHours * parkingFeePerHour;
 
-  const estPitchFee = Math.ceil(match.pitchRentalCost / maxPlayers);
+  // Real-time dynamic fee: Costo Cancha / Jugadores Inscritos (en nómina confirmada)
   const confirmedPlayersCount = confirmedList.length;
-  const dynamicPitchFee = confirmedPlayersCount > 0 ? Math.ceil(match.pitchRentalCost / confirmedPlayersCount) : estPitchFee;
+  const currentInscribedDivider = confirmedPlayersCount > 0 ? confirmedPlayersCount : 1;
+  const dynamicPitchFee = Math.ceil(match.pitchRentalCost / currentInscribedDivider);
+  const estPitchFee = dynamicPitchFee;
   
   // Total fee calculated for this user
-  const guestPitchFee = hasGuest && guestType === 'PLAYER' ? estPitchFee : 0;
-  const totalEstimatedForUser = estPitchFee + guestPitchFee + (hasVehicle ? parkingFee : 0);
+  const guestPitchFee = hasGuest && guestType === 'PLAYER' ? dynamicPitchFee : 0;
+  const totalEstimatedForUser = dynamicPitchFee + guestPitchFee + (hasVehicle ? parkingFee : 0);
 
   const getPlayer = (id: string) => players.find((p) => p.id === id);
 
@@ -185,10 +203,14 @@ export function PublicRsvpView({
     window.open(url, '_blank');
   };
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     const url = typeof window !== 'undefined' ? window.location.href : `/rsvp/${match.id}`;
-    navigator.clipboard.writeText(url);
-    setFeedback({ success: true, message: 'Enlace del formulario copiado al portapapeles.' });
+    const ok = await copyToClipboard(url);
+    if (ok) {
+      setFeedback({ success: true, message: 'Enlace del formulario copiado al portapapeles.' });
+    } else {
+      setFeedback({ success: false, message: 'No se pudo copiar automáticamente.' });
+    }
   };
 
   // Step 1: Validate Google Email & Intelligent Auto-recognition
@@ -390,7 +412,15 @@ export function PublicRsvpView({
         );
 
         if (!resPlayer.success) {
-          setFeedback(resPlayer);
+          if (resPlayer.errorCode === 'ALREADY_REGISTERED') {
+            setFeedback({
+              success: false,
+              message: '⚠️ Este jugador ya se encuentra formalmente inscrito y confirmado en la nómina oficial. Puedes revisar su posición abajo.',
+            });
+            setShowRosterModal(true);
+          } else {
+            setFeedback(resPlayer);
+          }
           return;
         }
 
@@ -427,8 +457,18 @@ export function PublicRsvpView({
           return updated;
         });
 
+        // Compute exact dynamic fee with newly enrolled attendees
+        const existingPlayingCount = attendances.filter(
+          (a) => (a.status === 'CONFIRMED' || a.status === 'ATTENDED') && a.guestType !== 'COMPANION'
+        ).length;
+        const newlyAddedPlayingCount = newAttendancesToAdd.filter((a) => a.guestType !== 'COMPANION').length;
+        const totalPlayingCountAfterEnrollment = Math.max(1, existingPlayingCount + newlyAddedPlayingCount);
+        const dynamicCostPerPlayer = Math.ceil(match.pitchRentalCost / totalPlayingCountAfterEnrollment);
+        const dynamicGuestCost = hasGuest && guestType === 'PLAYER' ? dynamicCostPerPlayer : 0;
+        const exactUserTotal = dynamicCostPerPlayer + dynamicGuestCost + (hasVehicle ? parkingFee : 0);
+
         setCompletedPlayerId(playerIdToUse);
-        setPaymentAmount(totalEstimatedForUser);
+        setPaymentAmount(exactUserTotal);
         setPaymentNote(`Cuota partido - ${match.location}`);
         setStep('completed');
       } catch (err) {
@@ -471,8 +511,8 @@ export function PublicRsvpView({
     },
   ];
 
-  const handleCopyBank = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopyBank = async (text: string, id: string) => {
+    await copyToClipboard(text);
     setCopiedBankId(id);
     setTimeout(() => setCopiedBankId(null), 2500);
   };
@@ -577,7 +617,14 @@ export function PublicRsvpView({
               </div>
             )}
             <div className="flex justify-between items-center text-zinc-300 pt-1">
-              <span className="text-zinc-400">Cuota Total Estimada:</span>
+              <div>
+                <span className="text-zinc-400 block">Cuota Total Estimada:</span>
+                <span className="text-[10px] text-zinc-500">
+                  {confirmedPlayersCount > 0
+                    ? `Cuota: $${dynamicPitchFee.toLocaleString('es-CO')} COP (${confirmedPlayersCount} inscritos confirmados)`
+                    : `Cuota: $${dynamicPitchFee.toLocaleString('es-CO')} COP`}
+                </span>
+              </div>
               <span className="text-emerald-400 font-mono font-bold text-sm">
                 ${totalEstimatedForUser.toLocaleString('es-CO')} COP
               </span>
@@ -922,9 +969,19 @@ export function PublicRsvpView({
             <span className="text-zinc-600">•</span>
             <span className="text-emerald-400 font-medium">Inscripción Oficial</span>
           </div>
-          {registerMode === 'new' && (
-            <span className="font-mono text-zinc-400 text-xs">Paso {step} de 5</span>
-          )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowRosterModal(true)}
+              className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 font-semibold bg-emerald-950/60 hover:bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-500/40 transition-all cursor-pointer shadow-sm"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Ver Nómina ({confirmedList.length}/{maxPlayers})</span>
+            </button>
+            {registerMode === 'new' && (
+              <span className="font-mono text-zinc-400 text-xs">Paso {step} de 5</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -970,7 +1027,7 @@ export function PublicRsvpView({
                 className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-emerald-500 rounded-2xl px-4 py-3 text-base text-zinc-100 focus:outline-none transition-all"
               >
                 {players.map((p) => {
-                  const isRegistered = registeredPlayerIds.has(p.id);
+                  const isRegistered = isPlayerRegistered(p);
                   return (
                     <option
                       key={p.id}
@@ -978,7 +1035,7 @@ export function PublicRsvpView({
                       disabled={isRegistered}
                       className={isRegistered ? 'text-zinc-500 bg-zinc-900' : 'text-zinc-100'}
                     >
-                      {p.fullName} {p.documentId ? `(CC: ${p.documentId})` : ''} {isRegistered ? '— (Ya Inscrito ✓)' : '— [Disponible]'}
+                      {p.fullName} {p.documentId ? `(CC: ${p.documentId})` : ''} {isRegistered ? '— (Ya Inscrito en Nómina ✓)' : '— [Disponible]'}
                     </option>
                   );
                 })}
@@ -1581,7 +1638,11 @@ export function PublicRsvpView({
                   <div className="flex justify-between items-center text-zinc-300 pt-1">
                     <div>
                       <span className="text-zinc-400 block">Cuota Total Estimada:</span>
-                      <span className="text-[10px] text-zinc-500">Base cupo 18: ${estPitchFee.toLocaleString('es-CO')} c/u</span>
+                      <span className="text-[10px] text-zinc-500">
+                        {confirmedPlayersCount > 0
+                          ? `Cuota: $${dynamicPitchFee.toLocaleString('es-CO')} COP (${confirmedPlayersCount} inscritos confirmados)`
+                          : `Cuota: $${dynamicPitchFee.toLocaleString('es-CO')} COP`}
+                      </span>
                     </div>
                     <span className="text-emerald-400 font-mono font-bold text-sm">
                       ${totalEstimatedForUser.toLocaleString('es-CO')} COP
@@ -1639,8 +1700,9 @@ export function PublicRsvpView({
                 <span className="font-semibold text-zinc-100 capitalize">{formattedDate}</span>
               </div>
               <div>
-                <span className="text-[10px] text-zinc-500 uppercase block font-semibold">Cuota Cancha</span>
-                <span className="font-semibold text-emerald-400 font-mono">${estPitchFee.toLocaleString('es-CO')} COP</span>
+                <span className="text-[10px] text-zinc-500 uppercase block font-semibold">Cuota Cancha (Dinámica)</span>
+                <span className="font-semibold text-emerald-400 font-mono">${dynamicPitchFee.toLocaleString('es-CO')} COP</span>
+                <span className="text-[10px] text-zinc-500 block">({confirmedPlayersCount} confirmados)</span>
               </div>
               <div>
                 <span className="text-[10px] text-zinc-500 uppercase block font-semibold">Cupos</span>
@@ -1653,6 +1715,153 @@ export function PublicRsvpView({
           </div>
         )}
       </div>
+
+      {/* Live Roster Convocatoria Modal */}
+      {showRosterModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-6 max-w-lg w-full max-h-[90vh] flex flex-col space-y-4 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    Nómina Oficial Convocada
+                    <Badge variant={isFull ? 'default' : 'secondary'} className="text-[10px]">
+                      {confirmedList.length}/{maxPlayers} Cupos
+                    </Badge>
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    Jugadores confirmados y estado de la nómina en vivo
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRosterModal(false)}
+                className="text-zinc-400 hover:text-white p-1.5 rounded-full bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Scrollable list */}
+            <div className="overflow-y-auto space-y-4 pr-1 text-xs divide-y divide-zinc-800/60 flex-1">
+              {/* Confirmed Squad */}
+              <div className="space-y-2 pt-1">
+                <div className="flex justify-between items-center text-zinc-400 font-semibold uppercase text-[10px] tracking-wider">
+                  <span>⚽ Jugadores Confirmados ({confirmedList.length})</span>
+                  <span className="text-emerald-400 font-mono">
+                    ${dynamicPitchFee.toLocaleString('es-CO')} c/u
+                  </span>
+                </div>
+                {confirmedList.length === 0 ? (
+                  <p className="text-zinc-500 italic py-2">No hay jugadores confirmados aún.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {confirmedList.map((att, idx) => {
+                      const host = getPlayer(att.playerId);
+                      const companion = attendances.find(
+                        (a) =>
+                          a.playerId === att.playerId &&
+                          a.guestName &&
+                          a.id !== att.id &&
+                          (a.status === 'CONFIRMED' || a.status === 'ATTENDED')
+                      );
+                      return (
+                        <div
+                          key={att.id}
+                          className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950/50 border border-zinc-800/80 hover:border-zinc-700 transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="font-mono text-[11px] font-bold text-emerald-400 w-5 text-center shrink-0">
+                              #{idx + 1}
+                            </span>
+                            <div className="truncate">
+                              <span className="font-semibold text-zinc-100 block truncate">
+                                {host?.fullName || att.guestName || att.playerId}
+                              </span>
+                              {companion && (
+                                <span className="text-[10px] text-zinc-400 flex items-center gap-1">
+                                  <span>+ Invitado:</span>
+                                  <strong className="text-emerald-300">{companion.guestName}</strong>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {att.vehiclePlate && (
+                              <span className="text-[10px] font-mono font-bold bg-zinc-800 text-amber-300 px-2 py-0.5 rounded border border-amber-500/20">
+                                🚗 {att.vehiclePlate}
+                              </span>
+                            )}
+                            <Badge variant="outline" className="text-[10px] bg-emerald-950/40 border-emerald-500/30 text-emerald-300">
+                              Confirmado
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Waitlist (if any) */}
+              {waitlistList.length > 0 && (
+                <div className="space-y-2 pt-3">
+                  <div className="text-zinc-400 font-semibold uppercase text-[10px] tracking-wider">
+                    ⏳ Lista de Espera ({waitlistList.length})
+                  </div>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {waitlistList.map((att, idx) => {
+                      const host = getPlayer(att.playerId);
+                      return (
+                        <div
+                          key={att.id}
+                          className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950/30 border border-amber-500/20"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-mono text-[11px] font-bold text-amber-400 w-5 text-center shrink-0">
+                              W{idx + 1}
+                            </span>
+                            <span className="font-semibold text-zinc-200 truncate">
+                              {host?.fullName || att.guestName || att.playerId}
+                            </span>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] bg-amber-950/40 border-amber-500/30 text-amber-300">
+                            En Espera
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer with live fee info */}
+            <div className="pt-3 border-t border-zinc-800 flex items-center justify-between">
+              <div className="text-xs">
+                <span className="text-zinc-500 block text-[10px]">Cuota Cancha en Vivo:</span>
+                <span className="text-emerald-400 font-mono font-bold">
+                  ${dynamicPitchFee.toLocaleString('es-CO')} COP
+                </span>
+                <span className="text-zinc-500 text-[10px] ml-1">
+                  ({confirmedPlayersCount} confirmados)
+                </span>
+              </div>
+              <Button
+                type="button"
+                onClick={() => setShowRosterModal(false)}
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs px-4 py-2 rounded-xl"
+              >
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
