@@ -327,7 +327,7 @@ export function MatchGoalsTracker({
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[10px] text-zinc-500">
-                        {entry.isGuest ? '👤 Invitado' : entry.position || 'Jugador'}
+                        {entry.isGuest ? '👤 Invitado' : 'Jugador'}
                       </span>
                       {goalsCount > 0 && (
                         <span className="text-[11px] font-black text-emerald-400 flex items-center gap-0.5 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-500/40">
