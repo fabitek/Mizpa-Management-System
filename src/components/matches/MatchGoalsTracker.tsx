@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useTransition, useMemo } from 'react';
 import {
   Trophy,
   Target,
@@ -8,12 +8,11 @@ import {
   Minus,
   Trash2,
   Star,
-  Flame,
-  User,
   CheckCircle2,
   Clock,
   Sparkles,
   Award,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '../ui/button.tsx';
 import { Badge } from '../ui/badge.tsx';
@@ -42,6 +41,11 @@ export function MatchGoalsTracker({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Filter roster to only include active players (exclude non-playing companions/spectators)
+  const playingRoster = useMemo(() => {
+    return roster.filter((entry) => entry.guestType !== 'COMPANION');
+  }, [roster]);
 
   // Custom Goal Dialog State
   const [selectedPlayerForGoal, setSelectedPlayerForGoal] = useState<string | null>(null);
@@ -73,11 +77,11 @@ export function MatchGoalsTracker({
     const fromRoster = roster.find((r) => r.playerId === playerId);
     if (fromRoster) return fromRoster.fullName;
     const fromAll = allPlayers.find((p) => p.id === playerId);
-    return fromAll?.fullName || 'Jugador Desconocido';
+    return fromAll?.fullName || 'Jugador';
   };
 
   // Count goals per player in this match
-  const playerGoalsCount = React.useMemo(() => {
+  const playerGoalsCount = useMemo(() => {
     const counts = new Map<string, number>();
     for (const g of goals) {
       if (g.type !== 'OWN_GOAL') {
@@ -92,6 +96,10 @@ export function MatchGoalsTracker({
 
   // Quick 1-Tap Record Goal
   const handleQuickGoal = (playerId: string) => {
+    if (!playerId) {
+      setFeedback({ success: false, message: 'ID de jugador inválido.' });
+      return;
+    }
     setFeedback(null);
     startTransition(async () => {
       const res = await recordGoalAction(match.id, playerId, undefined, 'OPEN_PLAY');
@@ -181,6 +189,19 @@ export function MatchGoalsTracker({
     });
   };
 
+  // Unique players for MVP select
+  const uniquePlayingPlayers = useMemo(() => {
+    const seen = new Set<string>();
+    const list: ConfirmedRosterEntry[] = [];
+    for (const p of playingRoster) {
+      if (!seen.has(p.playerId)) {
+        seen.add(p.playerId);
+        list.push(p);
+      }
+    }
+    return list;
+  }, [playingRoster]);
+
   return (
     <div className="space-y-6">
       {/* Toast Feedback */}
@@ -196,14 +217,14 @@ export function MatchGoalsTracker({
             {feedback.success ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             ) : (
-              <Award className="w-4 h-4 text-rose-400 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
             )}
             <span className="font-semibold">{feedback.message}</span>
           </div>
           <button
             type="button"
             onClick={() => setFeedback(null)}
-            className="text-xs text-zinc-400 hover:text-white"
+            className="text-xs text-zinc-400 hover:text-white cursor-pointer"
           >
             ✕
           </button>
@@ -247,9 +268,9 @@ export function MatchGoalsTracker({
               className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-amber-400 cursor-pointer"
             >
               <option value="">-- Seleccionar MVP del Partido --</option>
-              {roster.map((entry) => (
-                <option key={entry.playerId} value={entry.playerId}>
-                  ⭐ {entry.fullName} ({entry.position || 'Jugador'})
+              {uniquePlayingPlayers.map((entry) => (
+                <option key={`mvp-${entry.playerId}`} value={entry.playerId}>
+                  ⭐ {entry.fullName}
                 </option>
               ))}
             </select>
@@ -268,30 +289,31 @@ export function MatchGoalsTracker({
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
           <div className="space-y-0.5">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Trophy className="w-4 h-4 text-emerald-400" /> Registro de Goles por Jugador Convocado
+              <Trophy className="w-4 h-4 text-emerald-400" /> Registro de Goles por Jugador en Cancha
             </h3>
             <p className="text-xs text-zinc-400">
-              Presiona <span className="text-emerald-400 font-semibold">+1 Gol</span> para registrar un gol instantáneo durante el partido.
+              Presiona <span className="text-emerald-400 font-semibold">+ Gol</span> para anotar en vivo.
             </p>
           </div>
           <Badge variant="outline" className="text-xs border-zinc-700 text-zinc-300">
-            {roster.length} jugadores en nómina
+            {playingRoster.length} jugadores en nómina
           </Badge>
         </div>
 
-        {roster.length === 0 ? (
+        {playingRoster.length === 0 ? (
           <div className="py-8 text-center text-xs text-zinc-500">
             No hay jugadores confirmados en este partido para registrar goles.
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {roster.map((entry) => {
+            {playingRoster.map((entry, idx) => {
               const goalsCount = playerGoalsCount.get(entry.playerId) || 0;
               const isMvp = mvpPlayerId === entry.playerId;
+              const uniqueKey = `roster-card-${entry.playerId}-${entry.slotNumber || idx}`;
 
               return (
                 <div
-                  key={entry.playerId}
+                  key={uniqueKey}
                   className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
                     goalsCount > 0
                       ? 'bg-emerald-950/30 border-emerald-500/30 shadow-sm'
@@ -304,7 +326,9 @@ export function MatchGoalsTracker({
                       {isMvp && <span title="MVP del Partido">⭐</span>}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] text-zinc-500 uppercase">{entry.position || 'Jugador'}</span>
+                      <span className="text-[10px] text-zinc-500">
+                        {entry.isGuest ? '👤 Invitado' : entry.position || 'Jugador'}
+                      </span>
                       {goalsCount > 0 && (
                         <span className="text-[11px] font-black text-emerald-400 flex items-center gap-0.5 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-500/40">
                           ⚽ x{goalsCount}
@@ -373,7 +397,7 @@ export function MatchGoalsTracker({
           <div className="space-y-2">
             {goals.map((goal, idx) => (
               <div
-                key={goal.id}
+                key={goal.id || `goal-${idx}`}
                 className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800/80 text-xs"
               >
                 <div className="flex items-center gap-2.5">
@@ -421,7 +445,7 @@ export function MatchGoalsTracker({
               <button
                 type="button"
                 onClick={() => setSelectedPlayerForGoal(null)}
-                className="text-zinc-400 hover:text-white text-xs"
+                className="text-zinc-400 hover:text-white text-xs cursor-pointer"
               >
                 ✕ Cerrar
               </button>
@@ -469,7 +493,7 @@ export function MatchGoalsTracker({
                   variant="outline"
                   size="sm"
                   onClick={() => setSelectedPlayerForGoal(null)}
-                  className="text-xs border-zinc-700"
+                  className="text-xs border-zinc-700 cursor-pointer"
                 >
                   Cancelar
                 </Button>
@@ -477,7 +501,7 @@ export function MatchGoalsTracker({
                   type="submit"
                   size="sm"
                   disabled={isPending}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer"
                 >
                   Confirmar Gol
                 </Button>

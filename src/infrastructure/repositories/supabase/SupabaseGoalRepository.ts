@@ -38,10 +38,18 @@ export class SupabaseGoalRepository implements IGoalRepository {
   private mapEntityToRow(goal: GoalEvent): Partial<GoalRow> {
     const validId = ensureUUID(goal.id);
     goal.id = validId;
+
+    if (!goal.matchId || !UUID_REGEX.test(goal.matchId)) {
+      throw new Error(`Cannot record goal: Invalid match ID '${goal.matchId}'`);
+    }
+    if (!goal.playerId || !UUID_REGEX.test(goal.playerId)) {
+      throw new Error(`Cannot record goal: Invalid player ID '${goal.playerId}'`);
+    }
+
     return {
       id: validId,
-      match_id: ensureUUID(goal.matchId),
-      player_id: ensureUUID(goal.playerId),
+      match_id: goal.matchId,
+      player_id: goal.playerId,
       minute: goal.minute ?? null,
       type: goal.type,
       created_at: goal.createdAt ? goal.createdAt.toISOString() : new Date().toISOString(),
