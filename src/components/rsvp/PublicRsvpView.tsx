@@ -364,9 +364,34 @@ export function PublicRsvpView({
       setFeedback({ success: false, message: 'Por favor ingresa la placa de tu vehículo.' });
       return;
     }
-    if (hasGuest && !guestName.trim()) {
-      setFeedback({ success: false, message: 'Por favor ingresa el nombre de tu invitado (+1).' });
-      return;
+    if (hasGuest) {
+      if (!guestName.trim()) {
+        setFeedback({ success: false, message: 'Por favor ingresa el nombre de tu invitado (+1).' });
+        return;
+      }
+      const norm = (s: string) =>
+        s
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '');
+
+      const cleanGuest = norm(guestName);
+      const hostName = norm(newPlayerName || recognizedPlayer?.fullName || '');
+      const hostAlias = norm(recognizedPlayer?.alias || '');
+      const hostEmailName = norm((gmailAddress || '').split('@')[0] || '');
+
+      if (
+        (cleanGuest && cleanGuest === hostName) ||
+        (hostAlias && cleanGuest === hostAlias) ||
+        (hostEmailName && cleanGuest === hostEmailName)
+      ) {
+        setFeedback({
+          success: false,
+          message: '⚠️ El nombre de tu invitado no puede ser tu propio nombre. Si asistes solo, desmarca la opción de invitado (+1).',
+        });
+        return;
+      }
     }
     setFeedback(null);
     setStep(5);

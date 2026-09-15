@@ -189,7 +189,8 @@ function createContainer(): DIContainer {
   const openMatchRegistrationUseCase = new OpenMatchRegistrationUseCase(matchRepository);
   const registerAttendanceUseCase = new RegisterAttendanceUseCase(
     matchRepository,
-    attendanceRepository
+    attendanceRepository,
+    playerRepository
   );
   const cancelAttendanceUseCase = new CancelAttendanceUseCase(
     matchRepository,

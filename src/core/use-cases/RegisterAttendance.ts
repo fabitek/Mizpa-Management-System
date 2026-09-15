@@ -3,6 +3,7 @@ import type {
   AttendanceStatus,
   IMatchRepository,
   IAttendanceRepository,
+  IPlayerRepository,
 } from '../domain/index.ts';
 import {
   MatchNotFoundError,
@@ -30,15 +31,18 @@ export interface RegisterAttendanceResult {
 export class RegisterAttendanceUseCase {
   private readonly matchRepository: IMatchRepository;
   private readonly attendanceRepository: IAttendanceRepository;
+  private readonly playerRepository?: IPlayerRepository;
   private readonly idGenerator?: () => string;
 
   constructor(
     matchRepository: IMatchRepository,
     attendanceRepository: IAttendanceRepository,
+    playerRepository?: IPlayerRepository,
     idGenerator?: () => string
   ) {
     this.matchRepository = matchRepository;
     this.attendanceRepository = attendanceRepository;
+    this.playerRepository = playerRepository;
     this.idGenerator = idGenerator;
   }
 
@@ -83,6 +87,34 @@ export class RegisterAttendanceUseCase {
         );
       }
     } else {
+      // Validar que el invitado no sea el mismo jugador anfitrión
+      if (this.playerRepository) {
+        const hostPlayer = await this.playerRepository.findById(playerId);
+        if (hostPlayer) {
+          const norm = (s: string) =>
+            s
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, '');
+
+          const cleanGuestNorm = norm(guestName!);
+          const hostNameNorm = norm(hostPlayer.fullName || '');
+          const hostAliasNorm = hostPlayer.alias ? norm(hostPlayer.alias) : '';
+          const hostEmailNorm = hostPlayer.email ? norm(hostPlayer.email.split('@')[0]) : '';
+
+          if (
+            (cleanGuestNorm && cleanGuestNorm === hostNameNorm) ||
+            (hostAliasNorm && cleanGuestNorm === hostAliasNorm) ||
+            (hostEmailNorm && cleanGuestNorm === hostEmailNorm)
+          ) {
+            throw new PlayerAlreadyRegisteredError(
+              `El nombre del invitado ('${guestName}') coincide con el jugador anfitrión. El invitado debe ser una persona distinta.`
+            );
+          }
+        }
+      }
+
       // Chequeo de duplicado de invitado con el mismo nombre para el mismo jugador
       const trimmedGuestName = guestName!.trim().toLowerCase();
       const existingGuest = currentAttendances.find(
