@@ -1770,9 +1770,8 @@ export function MatchSettlementCard({
             <div className="space-y-4 animate-in fade-in duration-150">
               <MatchGoalsTracker
                 match={match}
-                roster={confirmedRoster}
-                allPlayers={allPlayers}
-                onGoalRecorded={loadData}
+                roster={buildLiveRosterEntries()}
+                allPlayers={players}
               />
             </div>
           )}
