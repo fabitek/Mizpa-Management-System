@@ -234,32 +234,35 @@ export function PublicRsvpView({
     if (matchedPlayer) {
       // Check if already registered in this match
       if (registeredPlayerIds.has(matchedPlayer.id)) {
-        const att = attendances.find((a) => a.playerId === matchedPlayer.id);
+        const att = attendances.find((a) => a.playerId === matchedPlayer.id && !a.guestName);
         const statusText =
           att?.status === 'CONFIRMED' || att?.status === 'ATTENDED'
             ? 'CONFIRMADO en nómina'
             : 'en LISTA DE ESPERA';
         setFeedback({
-          success: true,
-          message: `¡Hola, ${matchedPlayer.fullName}! Ya estás inscrito en este partido como ${statusText}.`,
+          success: false,
+          message: `⚠️ ¡Hola, ${matchedPlayer.fullName}! Ya te encuentras registrado en este partido como ${statusText}. No es necesario inscribirte de nuevo.`,
         });
         setRecognizedPlayer(matchedPlayer);
         setSelectedPlayerId(matchedPlayer.id);
+        setRegisterMode('existing');
         setNewPlayerName(matchedPlayer.fullName);
         setNewPlayerDocumentId(matchedPlayer.documentId || '');
         setNewPlayerPhone(matchedPlayer.phone || '');
+        setShowRosterModal(true);
         return;
       }
 
       // Autocomplete details
       setRecognizedPlayer(matchedPlayer);
       setSelectedPlayerId(matchedPlayer.id);
+      setRegisterMode('existing');
       setNewPlayerName(matchedPlayer.fullName);
       setNewPlayerDocumentId(matchedPlayer.documentId || '');
       setNewPlayerPhone(matchedPlayer.phone || '');
       setFeedback({
         success: true,
-        message: `⚡ ¡Hola, ${matchedPlayer.fullName}! Reconocimos tu cuenta de Google. Datos precargados automáticamente.`,
+        message: `⚡ ¡Hola, ${matchedPlayer.fullName}! Reconocimos tu cuenta de Google (${matchedPlayer.email}). Tus datos fueron vinculados automáticamente.`,
       });
       // Skip directly to Step 4 (Logistics / Vehicle & Guest)
       setStep(4);
@@ -302,6 +305,7 @@ export function PublicRsvpView({
       if (matched && (!recognizedPlayer || recognizedPlayer.id !== matched.id)) {
         setRecognizedPlayer(matched);
         setSelectedPlayerId(matched.id);
+        setRegisterMode('existing');
         if (matched.fullName) setNewPlayerName(matched.fullName);
         if (matched.phone) setNewPlayerPhone(matched.phone);
         if (matched.email && !gmailAddress) setGmailAddress(matched.email);
@@ -330,14 +334,23 @@ export function PublicRsvpView({
     const matched = players.find((p) => p.documentId && p.documentId.trim() === cleanDoc);
     if (matched) {
       if (registeredPlayerIds.has(matched.id)) {
+        const att = attendances.find((a) => a.playerId === matched.id && !a.guestName);
+        const statusText =
+          att?.status === 'CONFIRMED' || att?.status === 'ATTENDED'
+            ? 'CONFIRMADO en nómina'
+            : 'en LISTA DE ESPERA';
         setFeedback({
           success: false,
-          message: `¡Hola ${matched.fullName}! Esta cédula ya se encuentra registrada en este partido.`,
+          message: `⚠️ ¡Hola, ${matched.fullName}! Esta cédula ya se encuentra registrada en este partido como ${statusText}.`,
         });
+        setShowRosterModal(true);
         return;
       }
       setRecognizedPlayer(matched);
       setSelectedPlayerId(matched.id);
+      setRegisterMode('existing');
+      if (matched.fullName) setNewPlayerName(matched.fullName);
+      if (matched.phone) setNewPlayerPhone(matched.phone);
     }
 
     setFeedback(null);
@@ -363,23 +376,35 @@ export function PublicRsvpView({
   const handleFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    let playerIdToUse = selectedPlayerId;
+    let playerIdToUse = selectedPlayerId || recognizedPlayer?.id || '';
     let displayName = '';
 
-    if (registerMode === 'new') {
+    // Safety deduplication check against in-memory players list
+    const cleanEmail = gmailAddress.trim().toLowerCase();
+    const cleanDoc = newPlayerDocumentId.trim();
+    const matchedExisting = players.find(
+      (p) =>
+        (cleanEmail && p.email && p.email.trim().toLowerCase() === cleanEmail) ||
+        (cleanDoc && p.documentId && p.documentId.trim() === cleanDoc)
+    );
+
+    if (matchedExisting) {
+      playerIdToUse = matchedExisting.id;
+      displayName = matchedExisting.fullName;
+    } else if (registerMode === 'new') {
       displayName = newPlayerName.trim();
     } else {
-      if (!selectedPlayerId) {
+      if (!playerIdToUse) {
         setFeedback({ success: false, message: 'Por favor selecciona tu nombre de la lista.' });
         return;
       }
-      const p = getPlayer(selectedPlayerId);
-      displayName = p ? p.fullName : selectedPlayerId;
+      const p = getPlayer(playerIdToUse);
+      displayName = p ? p.fullName : playerIdToUse;
     }
 
     startTransition(async () => {
       try {
-        if (registerMode === 'new') {
+        if (!matchedExisting && registerMode === 'new') {
           const playerRes = await createPlayerAction({
             fullName: newPlayerName.trim(),
             documentId: newPlayerDocumentId.trim(),
@@ -1762,13 +1787,17 @@ export function PublicRsvpView({
                   <div className="grid grid-cols-1 gap-1.5">
                     {confirmedList.map((att, idx) => {
                       const host = getPlayer(att.playerId);
-                      const companion = attendances.find(
-                        (a) =>
-                          a.playerId === att.playerId &&
-                          a.guestName &&
-                          a.id !== att.id &&
-                          (a.status === 'CONFIRMED' || a.status === 'ATTENDED')
-                      );
+                      const isGuest = Boolean(att.guestName && att.guestName.trim().length > 0);
+                      const companion = !isGuest
+                        ? attendances.find(
+                            (a) =>
+                              a.playerId === att.playerId &&
+                              a.guestName &&
+                              a.guestType === 'COMPANION' &&
+                              a.id !== att.id &&
+                              (a.status === 'CONFIRMED' || a.status === 'ATTENDED')
+                          )
+                        : null;
                       return (
                         <div
                           key={att.id}
@@ -1779,21 +1808,34 @@ export function PublicRsvpView({
                               #{idx + 1}
                             </span>
                             <div className="truncate">
-                              <span className="font-semibold text-zinc-100 block truncate">
-                                {host?.fullName || att.guestName || att.playerId}
-                              </span>
-                              {companion && (
-                                <span className="text-[10px] text-zinc-400 flex items-center gap-1">
-                                  <span>+ Invitado:</span>
-                                  <strong className="text-emerald-300">{companion.guestName}</strong>
-                                </span>
+                              {isGuest ? (
+                                <div>
+                                  <span className="font-semibold text-emerald-300 block truncate">
+                                    ⚽ {att.guestName}
+                                  </span>
+                                  <span className="text-[10px] text-zinc-400">
+                                    Invitado de <strong className="text-zinc-300">{host?.fullName || 'Jugador'}</strong>
+                                  </span>
+                                </div>
+                              ) : (
+                                <div>
+                                  <span className="font-semibold text-zinc-100 block truncate">
+                                    ⚽ {host?.fullName || att.playerId}
+                                  </span>
+                                  {companion && (
+                                    <span className="text-[10px] text-blue-300 flex items-center gap-1">
+                                      <span>+ Acompañante:</span>
+                                      <strong className="text-blue-200">{companion.guestName}</strong>
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {att.vehiclePlate && (
                               <span className="text-[10px] font-mono font-bold bg-zinc-800 text-amber-300 px-2 py-0.5 rounded border border-amber-500/20">
-                                🚗 {att.vehiclePlate}
+                                {formatPlateBadge(att.vehiclePlate)}
                               </span>
                             )}
                             <Badge variant="outline" className="text-[10px] bg-emerald-950/40 border-emerald-500/30 text-emerald-300">
@@ -1816,6 +1858,7 @@ export function PublicRsvpView({
                   <div className="grid grid-cols-1 gap-1.5">
                     {waitlistList.map((att, idx) => {
                       const host = getPlayer(att.playerId);
+                      const isGuest = Boolean(att.guestName && att.guestName.trim().length > 0);
                       return (
                         <div
                           key={att.id}
@@ -1825,9 +1868,22 @@ export function PublicRsvpView({
                             <span className="font-mono text-[11px] font-bold text-amber-400 w-5 text-center shrink-0">
                               W{idx + 1}
                             </span>
-                            <span className="font-semibold text-zinc-200 truncate">
-                              {host?.fullName || att.guestName || att.playerId}
-                            </span>
+                            <div className="truncate">
+                              {isGuest ? (
+                                <div>
+                                  <span className="font-semibold text-amber-300 truncate block">
+                                    ⚽ {att.guestName}
+                                  </span>
+                                  <span className="text-[10px] text-zinc-400">
+                                    Invitado de {host?.fullName || 'Jugador'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="font-semibold text-zinc-200 truncate block">
+                                  ⚽ {host?.fullName || att.playerId}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <Badge variant="outline" className="text-[10px] bg-amber-950/40 border-amber-500/30 text-amber-300">
                             En Espera
