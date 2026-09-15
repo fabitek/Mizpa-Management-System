@@ -1,151 +1,308 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Play,
   Pause,
-  Square,
   RotateCcw,
   Clock,
   Plus,
   Minus,
+  Volume2,
+  VolumeX,
+  Bell,
+  Settings2,
   CheckCircle2,
+  AlertTriangle,
+  Flame,
 } from 'lucide-react';
 import { Button } from '../ui/button.tsx';
 
-export type MatchPeriod =
-  | 'NOT_STARTED'
-  | 'FIRST_HALF'
-  | 'HALF_TIME'
-  | 'SECOND_HALF'
-  | 'EXTRA_TIME'
-  | 'FINISHED';
+export type TimerMode = 'COUNTDOWN' | 'STOPWATCH';
 
 interface MatchLiveStopwatchProps {
   matchId: string;
   matchLocation: string;
   durationHours?: number;
-  onPeriodChange?: (period: MatchPeriod) => void;
 }
 
 interface SavedTimerState {
-  period: MatchPeriod;
+  mode: TimerMode;
+  initialMinutes: number;
+  remainingSeconds: number;
+  stopwatchSeconds: number;
   isRunning: boolean;
-  secondsElapsed: number;
   lastTimestamp: number;
+}
+
+// Web Audio API synthesized referee whistle & buzzer alert
+function playMatchAlarmSound() {
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
+    const playWhistleBlast = (startTime: number, duration: number, pitch = 2850) => {
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(pitch, startTime);
+
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(pitch * 1.15, startTime);
+
+      // LFO for referee trill
+      const lfo = ctx.createOscillator();
+      const lfoGain = ctx.createGain();
+      lfo.frequency.setValueAtTime(28, startTime); // 28Hz flutter
+      lfoGain.gain.setValueAtTime(140, startTime);
+      lfo.connect(osc1.frequency);
+      lfo.connect(osc2.frequency);
+
+      gain.gain.setValueAtTime(0.001, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.7, startTime + 0.04);
+      gain.gain.setValueAtTime(0.7, startTime + duration - 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      lfo.start(startTime);
+      osc1.start(startTime);
+      osc2.start(startTime);
+
+      lfo.stop(startTime + duration);
+      osc1.stop(startTime + duration);
+      osc2.stop(startTime + duration);
+    };
+
+    const playBuzzerBeep = (startTime: number, duration: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(880, startTime);
+      osc.frequency.exponentialRampToValueAtTime(440, startTime + duration);
+
+      gain.gain.setValueAtTime(0.01, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.5, startTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    };
+
+    const now = ctx.currentTime;
+    // 3 referee whistle blows
+    playWhistleBlast(now, 0.28, 2800);
+    playWhistleBlast(now + 0.38, 0.28, 2800);
+    playWhistleBlast(now + 0.78, 0.85, 2950);
+
+    // Accompanying electronic chime
+    playBuzzerBeep(now + 1.7, 0.3);
+    playBuzzerBeep(now + 2.1, 0.5);
+  } catch (e) {
+    console.warn('Could not play match alarm sound', e);
+  }
 }
 
 export function MatchLiveStopwatch({
   matchId,
   matchLocation,
   durationHours = 2,
-  onPeriodChange,
 }: MatchLiveStopwatchProps) {
-  const targetTotalMinutes = durationHours * 60;
-  const halfDurationMinutes = Math.floor(targetTotalMinutes / 2);
+  const storageKey = `mizpa_timer_v2_${matchId}`;
 
-  const storageKey = `mizpa_timer_${matchId}`;
-
-  const [period, setPeriod] = useState<MatchPeriod>('NOT_STARTED');
+  // Mode: COUNTDOWN (Cuenta Regresiva con Alarma) or STOPWATCH (Ascendente)
+  const [mode, setMode] = useState<TimerMode>('COUNTDOWN');
+  const [initialMinutes, setInitialMinutes] = useState<number>(5);
+  const [remainingSeconds, setRemainingSeconds] = useState<number>(5 * 60);
+  const [stopwatchSeconds, setStopwatchSeconds] = useState<number>(0);
   const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [seconds, setSeconds] = useState<number>(0);
+  const [isAlarmActive, setIsAlarmActive] = useState<boolean>(false);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [showConfig, setShowConfig] = useState<boolean>(false);
+  const [customMinInput, setCustomMinInput] = useState<string>('5');
 
-  // Load initial timer from localStorage
+  const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Trigger Alarm when time hits 0
+  const triggerAlarm = useCallback(() => {
+    setIsRunning(false);
+    setIsAlarmActive(true);
+    if (soundEnabled) {
+      playMatchAlarmSound();
+      // Repeat sound twice more for notice
+      if (alarmIntervalRef.current) clearInterval(alarmIntervalRef.current);
+      let count = 0;
+      alarmIntervalRef.current = setInterval(() => {
+        count++;
+        if (count >= 2) {
+          if (alarmIntervalRef.current) clearInterval(alarmIntervalRef.current);
+        } else {
+          playMatchAlarmSound();
+        }
+      }, 2500);
+    }
+  }, [soundEnabled]);
+
+  const dismissAlarm = () => {
+    setIsAlarmActive(false);
+    if (alarmIntervalRef.current) {
+      clearInterval(alarmIntervalRef.current);
+      alarmIntervalRef.current = null;
+    }
+  };
+
+  // Load from localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed: SavedTimerState = JSON.parse(saved);
-        let currentSeconds = parsed.secondsElapsed;
+        setMode(parsed.mode || 'COUNTDOWN');
+        setInitialMinutes(parsed.initialMinutes || 5);
+        setCustomMinInput(String(parsed.initialMinutes || 5));
+
+        let currentRemaining = parsed.remainingSeconds;
+        let currentStopwatch = parsed.stopwatchSeconds;
+
         if (parsed.isRunning && parsed.lastTimestamp) {
           const now = Date.now();
-          const diffSeconds = Math.floor((now - parsed.lastTimestamp) / 1000);
-          currentSeconds += Math.max(0, diffSeconds);
+          const elapsed = Math.floor((now - parsed.lastTimestamp) / 1000);
+          if (parsed.mode === 'COUNTDOWN') {
+            currentRemaining = Math.max(0, currentRemaining - elapsed);
+          } else {
+            currentStopwatch += elapsed;
+          }
         }
-        setPeriod(parsed.period);
-        setIsRunning(parsed.isRunning);
-        setSeconds(currentSeconds);
+
+        setRemainingSeconds(currentRemaining);
+        setStopwatchSeconds(currentStopwatch);
+        setIsRunning(parsed.isRunning && (parsed.mode === 'STOPWATCH' || currentRemaining > 0));
+
+        if (parsed.isRunning && parsed.mode === 'COUNTDOWN' && currentRemaining === 0) {
+          triggerAlarm();
+        }
       }
     } catch (e) {
       console.warn('Could not load timer state from localStorage', e);
     }
-  }, [matchId, storageKey]);
+  }, [matchId, storageKey, triggerAlarm]);
 
-  // Save timer state periodically
+  // Save to localStorage
   useEffect(() => {
     try {
       const stateToSave: SavedTimerState = {
-        period,
+        mode,
+        initialMinutes,
+        remainingSeconds,
+        stopwatchSeconds,
         isRunning,
-        secondsElapsed: seconds,
         lastTimestamp: Date.now(),
       };
       localStorage.setItem(storageKey, JSON.stringify(stateToSave));
     } catch (e) {
       // ignore
     }
-  }, [period, isRunning, seconds, storageKey]);
+  }, [mode, initialMinutes, remainingSeconds, stopwatchSeconds, isRunning, storageKey]);
 
-  // Stopwatch interval tick
+  // Main Ticker
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
+
     if (isRunning) {
       interval = setInterval(() => {
-        setSeconds((prev) => prev + 1);
+        if (mode === 'COUNTDOWN') {
+          setRemainingSeconds((prev) => {
+            if (prev <= 1) {
+              triggerAlarm();
+              return 0;
+            }
+            return prev - 1;
+          });
+        } else {
+          setStopwatchSeconds((prev) => prev + 1);
+        }
       }, 1000);
-    } else if (interval) {
-      clearInterval(interval);
     }
+
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isRunning]);
+  }, [isRunning, mode, triggerAlarm]);
 
-  const updatePeriod = (newPeriod: MatchPeriod) => {
-    setPeriod(newPeriod);
-    if (onPeriodChange) onPeriodChange(newPeriod);
+  // Quick Preset Handlers
+  const handleSelectPreset = (mins: number) => {
+    dismissAlarm();
+    setIsRunning(false);
+    setMode('COUNTDOWN');
+    setInitialMinutes(mins);
+    setCustomMinInput(String(mins));
+    setRemainingSeconds(mins * 60);
+    setShowConfig(false);
   };
 
-  const handleStartFirstHalf = () => {
-    updatePeriod('FIRST_HALF');
-    setIsRunning(true);
+  const handleApplyCustomMinutes = (e: React.FormEvent) => {
+    e.preventDefault();
+    const mins = parseFloat(customMinInput);
+    if (!isNaN(mins) && mins > 0) {
+      dismissAlarm();
+      setIsRunning(false);
+      setMode('COUNTDOWN');
+      setInitialMinutes(mins);
+      setRemainingSeconds(Math.round(mins * 60));
+      setShowConfig(false);
+    }
   };
 
-  const handlePauseToggle = () => {
+  const handleTogglePlay = () => {
+    dismissAlarm();
+    // Warm up AudioContext on user click so mobile browsers don't block alert sound
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+      }
+    } catch (e) {}
+
+    if (mode === 'COUNTDOWN' && remainingSeconds === 0) {
+      setRemainingSeconds(initialMinutes * 60);
+    }
     setIsRunning((prev) => !prev);
   };
 
-  const handleHalfTime = () => {
-    setIsRunning(false);
-    updatePeriod('HALF_TIME');
-  };
-
-  const handleStartSecondHalf = () => {
-    if (seconds < halfDurationMinutes * 60) {
-      setSeconds(halfDurationMinutes * 60);
-    }
-    updatePeriod('SECOND_HALF');
-    setIsRunning(true);
-  };
-
-  const handleFinishMatch = () => {
-    setIsRunning(false);
-    updatePeriod('FINISHED');
-  };
-
   const handleReset = () => {
-    if (window.confirm('¿Deseas reiniciar el cronómetro del partido a 00:00?')) {
-      setIsRunning(false);
-      setSeconds(0);
-      updatePeriod('NOT_STARTED');
-      try {
-        localStorage.removeItem(storageKey);
-      } catch (e) {}
+    dismissAlarm();
+    setIsRunning(false);
+    if (mode === 'COUNTDOWN') {
+      setRemainingSeconds(initialMinutes * 60);
+    } else {
+      setStopwatchSeconds(0);
     }
   };
 
-  const addMinutes = (mins: number) => {
-    setSeconds((prev) => Math.max(0, prev + mins * 60));
+  const addSeconds = (secs: number) => {
+    dismissAlarm();
+    if (mode === 'COUNTDOWN') {
+      setRemainingSeconds((prev) => Math.max(0, prev + secs));
+    } else {
+      setStopwatchSeconds((prev) => Math.max(0, prev + secs));
+    }
   };
 
   const formatTime = (totalSecs: number) => {
@@ -154,215 +311,295 @@ export function MatchLiveStopwatch({
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
-  const currentMinute = Math.floor(seconds / 60) + (seconds > 0 ? 1 : 0);
-  const totalTargetSecs = targetTotalMinutes * 60;
-  const progressPercent = Math.min(100, Math.round((seconds / Math.max(1, totalTargetSecs)) * 100));
+  const currentDisplaySeconds = mode === 'COUNTDOWN' ? remainingSeconds : stopwatchSeconds;
+  const totalTargetSecs = initialMinutes * 60;
+  const progressPercent =
+    mode === 'COUNTDOWN'
+      ? Math.min(100, Math.max(0, ((totalTargetSecs - remainingSeconds) / Math.max(1, totalTargetSecs)) * 100))
+      : Math.min(100, (stopwatchSeconds / (durationHours * 3600)) * 100);
 
-  const getPeriodBadge = () => {
-    switch (period) {
-      case 'NOT_STARTED':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700">
-            ⚪ Por Iniciar
-          </span>
-        );
-      case 'FIRST_HALF':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950/70 text-emerald-400 border border-emerald-500/30">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            🔴 1T EN VIVO
-          </span>
-        );
-      case 'HALF_TIME':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-950/70 text-amber-300 border border-amber-500/30">
-            ⏸️ Entretiempo
-          </span>
-        );
-      case 'SECOND_HALF':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950/70 text-emerald-400 border border-emerald-500/30">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            🔴 2T EN VIVO
-          </span>
-        );
-      case 'EXTRA_TIME':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-950/70 text-purple-300 border border-purple-500/30">
-            ⚡ Tiempo Extra
-          </span>
-        );
-      case 'FINISHED':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-300 border border-zinc-600">
-            🏁 Finalizado
-          </span>
-        );
-    }
-  };
+  const presets = [
+    { label: '5 min (Rápido)', mins: 5 },
+    { label: '7 min (Rotación)', mins: 7 },
+    { label: '10 min (Futsal)', mins: 10 },
+    { label: '15 min (Caimán)', mins: 15 },
+    { label: '20 min (Medio)', mins: 20 },
+    { label: '45 min (Oficial)', mins: 45 },
+  ];
 
   return (
-    <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden backdrop-blur-sm">
-      {/* Subtle top indicator bar */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-zinc-800">
+    <div
+      className={`relative overflow-hidden rounded-2xl border transition-all duration-300 shadow-xl backdrop-blur-sm ${
+        isAlarmActive
+          ? 'bg-rose-950/95 border-rose-500 ring-4 ring-rose-500/50 animate-pulse'
+          : isRunning
+          ? 'bg-zinc-900/95 border-emerald-500/40 shadow-emerald-950/20'
+          : 'bg-zinc-900/90 border-zinc-800'
+      } p-4 sm:p-5`}
+    >
+      {/* Top progress bar */}
+      <div className="absolute top-0 left-0 right-0 h-1.5 bg-zinc-800/80">
         <div
           className={`h-full transition-all duration-300 ${
-            isRunning ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 'bg-zinc-600'
+            isAlarmActive
+              ? 'bg-rose-500'
+              : isRunning
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+              : 'bg-zinc-600'
           }`}
-          style={{ width: `${progressPercent}%` }}
+          style={{ width: `${isAlarmActive ? 100 : progressPercent}%` }}
         />
       </div>
 
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Left: Status & Location */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                Control de Tiempo en Vivo
-              </span>
-              {getPeriodBadge()}
+      {/* Alarm Banner if active */}
+      {isAlarmActive && (
+        <div className="mb-4 rounded-xl bg-rose-500/20 border border-rose-500/50 p-3.5 flex items-center justify-between gap-3 text-rose-200 animate-bounce">
+          <div className="flex items-center gap-2.5">
+            <Bell className="w-5 h-5 text-rose-400 animate-spin" />
+            <div>
+              <p className="text-sm font-black text-white tracking-wide">¡TIEMPO CUMPLIDO! ⏰⚽</p>
+              <p className="text-xs text-rose-300">Cambio de equipo o fin del periodo ({initialMinutes} min).</p>
             </div>
-            <p className="text-xs text-zinc-500 truncate max-w-xs sm:max-w-md">
-              {matchLocation} • Meta: {targetTotalMinutes} min ({halfDurationMinutes}m / {halfDurationMinutes}m)
-            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={dismissAlarm}
+            className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-3 py-1.5 shadow-lg shadow-rose-950"
+          >
+            Detener Alarma
+          </Button>
+        </div>
+      )}
+
+      {/* Main Grid */}
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
+        {/* Left: Mode Title & Fast Presets */}
+        <div className="w-full lg:w-auto flex flex-col gap-2">
+          <div className="flex items-center justify-between lg:justify-start gap-2.5 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-emerald-400" />
+                {mode === 'COUNTDOWN' ? 'Temporizador de Partido' : 'Cronómetro Libre'}
+              </span>
+              {mode === 'COUNTDOWN' && (
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">
+                  {initialMinutes} min
+                </span>
+              )}
+            </div>
+
+            {/* Sound Mute & Config Toggles */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setSoundEnabled(!soundEnabled);
+                  if (!soundEnabled) playMatchAlarmSound();
+                }}
+                title={soundEnabled ? 'Silenciar alarma' : 'Activar alarma sonora'}
+                className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer flex items-center gap-1 ${
+                  soundEnabled
+                    ? 'bg-zinc-800 border-zinc-700 text-emerald-400 hover:bg-zinc-700'
+                    : 'bg-zinc-800/50 border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                <span className="text-[10px] hidden sm:inline">{soundEnabled ? 'Alarma ON' : 'Mute'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowConfig(!showConfig)}
+                title="Configurar tiempo personalizado"
+                className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer flex items-center gap-1 ${
+                  showConfig
+                    ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
+                    : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Settings2 className="w-3.5 h-3.5" />
+                <span className="text-[10px] hidden sm:inline">Ajustar</span>
+              </button>
+            </div>
+          </div>
+
+          <p className="text-xs text-zinc-500 truncate max-w-sm">
+            {matchLocation} • Sonará silbato y alarma al llegar a 00:00.
+          </p>
+
+          {/* Quick Presets Bar */}
+          <div className="flex items-center gap-1.5 flex-wrap pt-1">
+            <span className="text-[10px] font-semibold text-zinc-400 uppercase mr-1 flex items-center gap-1">
+              <Flame className="w-3 h-3 text-amber-400" /> Presets:
+            </span>
+            {presets.map((p) => (
+              <button
+                key={p.mins}
+                type="button"
+                onClick={() => handleSelectPreset(p.mins)}
+                className={`px-2 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  mode === 'COUNTDOWN' && initialMinutes === p.mins
+                    ? 'bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/20 font-bold'
+                    : 'bg-zinc-800/90 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700/60'
+                }`}
+              >
+                {p.mins}m
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Center: Digital Clock */}
-        <div className="flex items-center gap-4 py-1">
-          <div className="bg-zinc-950/80 border border-zinc-800/90 rounded-2xl px-5 py-2.5 shadow-inner flex items-baseline gap-2">
+        {/* Center: Big Digital Clock & Micro-adjustments */}
+        <div className="flex items-center gap-3 py-1">
+          <div className="bg-zinc-950/90 border border-zinc-800/90 rounded-2xl px-6 py-3 shadow-inner flex items-baseline gap-2.5">
             <span
-              className={`font-mono text-3xl sm:text-4xl font-black tracking-tight ${
-                isRunning
-                  ? 'text-emerald-400 drop-shadow-[0_0_12px_rgba(52,211,153,0.3)]'
-                  : period === 'FINISHED'
-                  ? 'text-zinc-500'
+              className={`font-mono text-4xl sm:text-5xl font-black tracking-tight ${
+                isAlarmActive
+                  ? 'text-rose-400 drop-shadow-[0_0_16px_rgba(244,63,94,0.6)]'
+                  : isRunning
+                  ? 'text-emerald-400 drop-shadow-[0_0_14px_rgba(52,211,153,0.35)]'
+                  : remainingSeconds === 0 && mode === 'COUNTDOWN'
+                  ? 'text-rose-500'
                   : 'text-zinc-200'
               }`}
             >
-              {formatTime(seconds)}
+              {formatTime(currentDisplaySeconds)}
             </span>
-            {seconds > 0 && (
-              <span className="font-mono text-xs font-bold text-zinc-400">
-                Min {currentMinute}&apos;
-              </span>
-            )}
+            <span className="font-mono text-xs font-bold text-zinc-500 uppercase">
+              {mode === 'COUNTDOWN' ? 'Restante' : 'Total'}
+            </span>
           </div>
 
-          {/* Micro minute adjustment buttons */}
+          {/* Micro buttons (+1m, -1m, +30s) */}
           <div className="flex flex-col gap-1">
             <button
               type="button"
-              onClick={() => addMinutes(1)}
-              title="Sumar 1 minuto"
-              className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors text-[10px] flex items-center justify-center cursor-pointer"
+              onClick={() => addSeconds(60)}
+              title="Sumar 1 minuto (+60s)"
+              className="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors text-[10px] font-bold flex items-center justify-center cursor-pointer border border-zinc-700"
             >
-              <Plus className="w-3 h-3" />
+              +1m
             </button>
             <button
               type="button"
-              onClick={() => addMinutes(-1)}
-              title="Restar 1 minuto"
-              className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors text-[10px] flex items-center justify-center cursor-pointer"
+              onClick={() => addSeconds(-60)}
+              title="Restar 1 minuto (-60s)"
+              className="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors text-[10px] font-bold flex items-center justify-center cursor-pointer border border-zinc-700"
             >
-              <Minus className="w-3 h-3" />
+              -1m
             </button>
           </div>
         </div>
 
-        {/* Right: Quick Action Controls */}
-        <div className="flex items-center gap-2 flex-wrap justify-end w-full md:w-auto">
-          {period === 'NOT_STARTED' && (
-            <Button
-              onClick={handleStartFirstHalf}
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-1.5 shadow-md shadow-emerald-950 text-xs px-3.5 py-2"
-            >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              Iniciar Partido
-            </Button>
-          )}
+        {/* Right: Primary Action Controls */}
+        <div className="flex items-center gap-2 flex-wrap justify-center lg:justify-end w-full lg:w-auto">
+          <Button
+            onClick={handleTogglePlay}
+            size="sm"
+            className={`font-bold gap-2 text-xs px-4 py-2.5 shadow-lg cursor-pointer transition-all ${
+              isRunning
+                ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-950/40'
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/50'
+            }`}
+          >
+            {isRunning ? (
+              <>
+                <Pause className="w-4 h-4 fill-current" /> Pausar
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4 fill-current" />
+                {currentDisplaySeconds === 0 && mode === 'COUNTDOWN' ? 'Reiniciar & Iniciar' : 'Iniciar'}
+              </>
+            )}
+          </Button>
 
-          {(period === 'FIRST_HALF' || period === 'SECOND_HALF' || period === 'EXTRA_TIME') && (
-            <>
-              <Button
-                onClick={handlePauseToggle}
-                size="sm"
-                variant={isRunning ? 'outline' : 'default'}
-                className={`gap-1.5 text-xs font-semibold px-3 py-2 ${
-                  isRunning
-                    ? 'border-amber-500/40 text-amber-300 hover:bg-amber-950/40'
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                }`}
-              >
-                {isRunning ? (
-                  <>
-                    <Pause className="w-3.5 h-3.5 fill-current" /> Pausar
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-3.5 h-3.5 fill-current" /> Reanudar
-                  </>
-                )}
-              </Button>
+          <Button
+            onClick={handleReset}
+            size="sm"
+            variant="outline"
+            className="border-zinc-700 hover:bg-zinc-800 text-zinc-300 text-xs px-3 py-2.5 gap-1.5 cursor-pointer"
+            title="Reiniciar tiempo inicial"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reiniciar
+          </Button>
 
-              {period === 'FIRST_HALF' && (
-                <Button
-                  onClick={handleHalfTime}
-                  size="sm"
-                  variant="outline"
-                  className="border-zinc-700 hover:bg-zinc-800 text-zinc-300 text-xs px-2.5 py-2"
-                  title="Pausar y marcar entretiempo"
-                >
-                  Entretiempo
-                </Button>
-              )}
-
-              <Button
-                onClick={handleFinishMatch}
-                size="sm"
-                variant="outline"
-                className="border-rose-500/30 text-rose-300 hover:bg-rose-950/30 hover:border-rose-500/60 text-xs px-2.5 py-2"
-              >
-                <Square className="w-3 h-3 fill-current" /> Finalizar
-              </Button>
-            </>
-          )}
-
-          {period === 'HALF_TIME' && (
-            <Button
-              onClick={handleStartSecondHalf}
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-1.5 text-xs px-3.5 py-2"
-            >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              Iniciar 2do Tiempo
-            </Button>
-          )}
-
-          {period === 'FINISHED' && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-400 flex items-center gap-1 font-semibold">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Concluido
-              </span>
-            </div>
-          )}
-
-          {/* Reset button */}
-          {(period !== 'NOT_STARTED' || seconds > 0) && (
-            <button
-              type="button"
-              onClick={handleReset}
-              title="Reiniciar cronómetro"
-              className="p-2 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-          )}
+          {/* Test Sound Button */}
+          <button
+            type="button"
+            onClick={playMatchAlarmSound}
+            title="Probar sonido de alarma / silbato"
+            className="p-2.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-emerald-400 transition-colors border border-zinc-700/80 cursor-pointer"
+          >
+            <Volume2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
+
+      {/* Collapsible Custom Minutes Configuration Form */}
+      {showConfig && (
+        <form
+          onSubmit={handleApplyCustomMinutes}
+          className="mt-4 pt-3 border-t border-zinc-800 flex flex-wrap items-center gap-3 bg-zinc-950/50 p-3 rounded-xl"
+        >
+          <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+            <Settings2 className="w-3.5 h-3.5 text-emerald-400" /> Tiempo exacto por periodo:
+          </span>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              step="0.5"
+              min="0.5"
+              max="120"
+              value={customMinInput}
+              onChange={(e) => setCustomMinInput(e.target.value)}
+              className="w-20 px-2.5 py-1 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-xs font-mono text-center focus:outline-none focus:border-emerald-500"
+              placeholder="Minutos"
+            />
+            <span className="text-xs text-zinc-400">minutos</span>
+            <Button
+              type="submit"
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3 py-1"
+            >
+              Establecer
+            </Button>
+          </div>
+
+          <div className="ml-auto flex items-center gap-2 text-xs">
+            <span className="text-zinc-500">Modo:</span>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('COUNTDOWN');
+                setIsRunning(false);
+              }}
+              className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                mode === 'COUNTDOWN'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-zinc-800 text-zinc-400 hover:text-white'
+              }`}
+            >
+              Cuenta Regresiva
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('STOPWATCH');
+                setIsRunning(false);
+              }}
+              className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                mode === 'STOPWATCH'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-zinc-800 text-zinc-400 hover:text-white'
+              }`}
+            >
+              Ascendente
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
