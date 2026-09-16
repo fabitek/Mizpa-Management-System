@@ -22,7 +22,8 @@ export async function recordPlayerCreditAction(
   playerId: string,
   amount: number,
   note?: string,
-  receiptUrl?: string
+  receiptUrl?: string,
+  matchId?: string | null
 ): Promise<FinancialActionResult> {
   try {
     const result = await recordPlayerCreditUseCase.execute({
@@ -30,6 +31,7 @@ export async function recordPlayerCreditAction(
       amount,
       note,
       receiptUrl,
+      matchId,
     });
 
     revalidatePath('/wallet');
@@ -143,6 +145,27 @@ export async function getTreasuryOverviewAction(
       success: false,
       message: error instanceof Error ? error.message : 'Error al consultar tesorería.',
       errorCode: 'UNKNOWN_ERROR',
+    };
+  }
+}
+
+export async function getAllFinancialEntriesAction(): Promise<FinancialActionResult> {
+  try {
+    const entries = await container.financeRepository.getAllEntries();
+    return {
+      success: true,
+      message: 'Entradas financieras obtenidas.',
+      data: entries.map((e) => ({
+        ...e,
+        referenceDate: e.referenceDate.toISOString(),
+        createdAt: e.createdAt.toISOString(),
+      })),
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al obtener entradas financieras.',
+      errorCode: 'FINANCE_ERROR',
     };
   }
 }

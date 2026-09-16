@@ -22,7 +22,7 @@ import {
   updateAttendanceGuestTypeAction,
 } from '../../app/actions/rsvp-actions.ts';
 import { recordPlayerCreditAction } from '../../app/actions/finance-actions.ts';
-import type { Match, Attendance, Player, MatchStatus, ConfirmedRosterEntry } from '../../core/domain/index.ts';
+import type { Match, Attendance, Player, MatchStatus, ConfirmedRosterEntry, FinancialEntry } from '../../core/domain/index.ts';
 import {
   formatWhatsAppGroupCapacityMessage,
   formatSecurityGateRosterMessage,
@@ -62,6 +62,12 @@ import {
   Edit2,
   Trash2,
   RefreshCw,
+  Banknote,
+  Receipt,
+  Check,
+  Coins,
+  Eye,
+  History,
 } from 'lucide-react';
 
 interface MatchSettlementCardProps {
@@ -70,6 +76,7 @@ interface MatchSettlementCardProps {
   initialAttendances: Attendance[];
   players: Player[];
   estimatedFee: number;
+  initialFinancialEntries?: FinancialEntry[];
 }
 
 export function MatchSettlementCard({
@@ -78,10 +85,12 @@ export function MatchSettlementCard({
   initialAttendances,
   players,
   estimatedFee,
+  initialFinancialEntries = [],
 }: MatchSettlementCardProps) {
   const [matches, setMatches] = useState<Match[]>(allMatches);
   const [match, setMatch] = useState<Match | null>(initialMatch);
   const [attendances, setAttendances] = useState<Attendance[]>(initialAttendances);
+  const [financialEntries, setFinancialEntries] = useState<FinancialEntry[]>(initialFinancialEntries);
   const [feedback, setFeedback] = useState<{ success: boolean; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -140,6 +149,9 @@ export function MatchSettlementCard({
   const [cashModalPlayer, setCashModalPlayer] = useState<{ id: string; name: string; suggestedAmount: number } | null>(null);
   const [cashAmount, setCashAmount] = useState<number>(10000);
   const [cashNote, setCashNote] = useState<string>('');
+
+  // Payment Breakdown & History Modal State
+  const [showPaymentsHistoryModal, setShowPaymentsHistoryModal] = useState<boolean>(false);
 
   // Minimalist active tab navigation
   const [activeTab, setActiveTab] = useState<'roster' | 'goals' | 'finances' | 'share'>('roster');
@@ -407,14 +419,81 @@ export function MatchSettlementCard({
       const res = await recordPlayerCreditAction(
         cashModalPlayer.id,
         cashAmount,
-        cashNote.trim() || `Pago en efectivo cancha - ${match?.location || 'Partido'}`
+        cashNote.trim() || `Pago en efectivo cancha - ${match?.location || 'Partido'}`,
+        undefined,
+        match?.id
       );
       setFeedback(res);
       if (res.success) {
+        if (res.data && (res.data as any).entry) {
+          const entryData = (res.data as any).entry;
+          const newEntry: FinancialEntry = {
+            id: entryData.id,
+            playerId: entryData.playerId,
+            type: 'CREDIT',
+            amount: entryData.amount,
+            referenceDate: new Date(entryData.referenceDate),
+            note: entryData.note,
+            matchId: match?.id,
+            receiptUrl: entryData.receiptUrl,
+            createdAt: new Date(entryData.createdAt),
+          };
+          setFinancialEntries((prev) => [newEntry, ...prev]);
+        }
         setCashModalPlayer(null);
       }
     });
   };
+
+  const getPlayerPaymentDetails = (playerId: string, playerFee: number) => {
+    const playerCredits = financialEntries.filter(
+      (e) =>
+        e.type === 'CREDIT' &&
+        e.playerId === playerId &&
+        (e.matchId === match?.id ||
+          (match && e.note && e.note.toLowerCase().includes(match.location.toLowerCase())))
+    );
+    const totalPaid = playerCredits.reduce((sum, e) => sum + e.amount, 0);
+    const isPaid = playerFee > 0 ? totalPaid >= playerFee : totalPaid > 0;
+    const isPartial = totalPaid > 0 && totalPaid < playerFee;
+    const pendingAmount = Math.max(0, playerFee - totalPaid);
+
+    return {
+      totalPaid,
+      isPaid,
+      isPartial,
+      pendingAmount,
+      credits: playerCredits,
+    };
+  };
+
+  const playingAttendances = attendances.filter(
+    (a) => a.guestType !== 'COMPANION' && a.status !== 'CANCELLED'
+  );
+
+  const totalTargetCollection = playingAttendances.reduce((acc, att) => {
+    const isDriver = !!(att.hasVehicle || att.vehiclePlate);
+    const fee = basePitchFee + (isDriver ? vehicleParkingFee : 0);
+    return acc + fee;
+  }, 0);
+
+  const matchFinancialCredits = financialEntries.filter(
+    (e) =>
+      e.type === 'CREDIT' &&
+      (e.matchId === match?.id ||
+        (match && e.note && e.note.toLowerCase().includes(match.location.toLowerCase())))
+  );
+
+  const totalCollected = matchFinancialCredits.reduce((acc, e) => acc + e.amount, 0);
+  const totalRemaining = Math.max(0, totalTargetCollection - totalCollected);
+  const paidPlayersCount = playingAttendances.filter((att) => {
+    const isDriver = !!(att.hasVehicle || att.vehiclePlate);
+    const fee = basePitchFee + (isDriver ? vehicleParkingFee : 0);
+    return getPlayerPaymentDetails(att.playerId, fee).isPaid;
+  }).length;
+  const collectionPercent = totalTargetCollection > 0
+    ? Math.min(100, Math.round((totalCollected / totalTargetCollection) * 100))
+    : 0;
 
   const getPlayer = (playerId: string) => players.find((p) => p.id === playerId);
 
@@ -1555,6 +1634,75 @@ export function MatchSettlementCard({
                 </Card>
               )}
 
+              {/* Bento Live Cash Collection & Payment Status Bar */}
+              <div className="bg-gradient-to-r from-zinc-900 via-zinc-900/90 to-zinc-950 border border-emerald-500/30 rounded-2xl p-4 shadow-xl space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <Banknote className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                          Recaudo en Cancha (Efectivo & Abonos)
+                        </h3>
+                        <Badge
+                          variant={paidPlayersCount === playingAttendances.length && playingAttendances.length > 0 ? 'success' : 'default'}
+                          className="text-[10px] font-mono py-0 px-1.5"
+                        >
+                          {paidPlayersCount} / {playingAttendances.length} al día
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-zinc-400">
+                        Control en tiempo real de pagos registrados por cada jugador.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => setShowPaymentsHistoryModal(true)}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs border-zinc-700 bg-zinc-800/60 hover:bg-zinc-800 text-emerald-300 gap-1.5 h-8 font-semibold shadow-sm"
+                    >
+                      <History className="w-3.5 h-3.5 text-emerald-400" />
+                      Historial ({matchFinancialCredits.length})
+                    </Button>
+                  </div>
+                </div>
+
+                {/* KPI Metrics */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-xl p-2.5">
+                    <span className="text-[11px] font-medium text-zinc-400 block">Total Recaudado:</span>
+                    <span className="text-base sm:text-lg font-black font-mono text-emerald-400">
+                      ${totalCollected.toLocaleString('es-CO')} <span className="text-[10px] text-zinc-500 font-normal">COP</span>
+                    </span>
+                  </div>
+
+                  <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-xl p-2.5">
+                    <span className="text-[11px] font-medium text-zinc-400 block">Pendiente por Cobrar:</span>
+                    <span className={`text-base sm:text-lg font-black font-mono ${totalRemaining > 0 ? 'text-amber-400' : 'text-zinc-400'}`}>
+                      ${totalRemaining.toLocaleString('es-CO')} <span className="text-[10px] text-zinc-500 font-normal">COP</span>
+                    </span>
+                  </div>
+
+                  <div className="col-span-2 sm:col-span-1 bg-zinc-950/60 border border-zinc-800/80 rounded-xl p-2.5 flex flex-col justify-between">
+                    <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                      <span>Meta de Cancha:</span>
+                      <span className="font-mono text-zinc-300 font-bold">{collectionPercent}%</span>
+                    </div>
+                    <div className="w-full bg-zinc-800 rounded-full h-2 mt-1.5 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${collectionPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Attendances & Playing Squad Table (ONLY PLAYERS) */}
               <Card className="border-zinc-800 bg-zinc-900/60 shadow-md overflow-hidden">
                 <CardHeader className="py-3 px-4 border-b border-zinc-800 flex flex-row items-center justify-between gap-2">
@@ -1588,8 +1736,9 @@ export function MatchSettlementCard({
                         <TableRow className="border-zinc-800 hover:bg-transparent text-xs">
                           <TableHead className="w-8">#</TableHead>
                           <TableHead>Jugador</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead>Cuota</TableHead>
+                          <TableHead>Asistencia</TableHead>
+                          <TableHead>Cuota Cancha</TableHead>
+                          <TableHead>Estado de Pago 💵</TableHead>
                           {!isSettled && <TableHead className="text-right">Acciones</TableHead>}
                         </TableRow>
                       </TableHeader>
@@ -1610,7 +1759,8 @@ export function MatchSettlementCard({
                               : 'default';
 
                             const isVehicleDriver = !!(att.hasVehicle || att.vehiclePlate);
-                            const playerFee = basePitchFee + (isVehicleDriver ? vehicleParkingFee : 0);
+                            const playerFee = isCancelled ? 0 : basePitchFee + (isVehicleDriver ? vehicleParkingFee : 0);
+                            const payment = getPlayerPaymentDetails(att.playerId, playerFee);
 
                             return (
                               <TableRow key={att.id} className={isCancelled ? 'opacity-50 text-xs' : 'text-xs'}>
@@ -1626,21 +1776,49 @@ export function MatchSettlementCard({
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="font-mono text-xs">
-                                  {isAttended ? (
-                                    <div>
-                                      <span className="font-bold text-emerald-400">
-                                        ${playerFee.toLocaleString('es-CO')} COP
-                                      </span>
-                                    </div>
-                                  ) : isCancelled ? (
+                                  {isCancelled ? (
                                     <span className="text-zinc-500">$0</span>
                                   ) : (
                                     <div>
-                                      <span className="text-zinc-400 font-medium">
+                                      <span className={isAttended ? 'font-bold text-zinc-200' : 'text-zinc-400'}>
                                         ${playerFee.toLocaleString('es-CO')} COP
                                       </span>
-                                      <span className="text-[9px] text-zinc-500 block">
-                                        (Pendiente)
+                                      {isVehicleDriver && (
+                                        <span className="text-[10px] text-amber-400 block">
+                                          +${vehicleParkingFee.toLocaleString('es-CO')} Parqueadero
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {isCancelled ? (
+                                    <span className="text-zinc-500 text-xs">—</span>
+                                  ) : payment.isPaid ? (
+                                    <div className="flex flex-col">
+                                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-md w-fit">
+                                        <Check className="w-3.5 h-3.5" /> Pagó ${payment.totalPaid.toLocaleString('es-CO')}
+                                      </span>
+                                      <span className="text-[10px] text-zinc-400 font-mono mt-0.5">
+                                        {payment.credits.length > 1 ? `${payment.credits.length} abonos registrados` : 'Efectivo en cancha'}
+                                      </span>
+                                    </div>
+                                  ) : payment.isPartial ? (
+                                    <div className="flex flex-col">
+                                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-400 bg-amber-950/60 border border-amber-500/40 px-2 py-0.5 rounded-md w-fit">
+                                        ⚠️ Abonó ${payment.totalPaid.toLocaleString('es-CO')}
+                                      </span>
+                                      <span className="text-[10px] text-amber-300/80 font-mono mt-0.5">
+                                        Resta: ${payment.pendingAmount.toLocaleString('es-CO')} COP
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex flex-col">
+                                      <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-400 bg-rose-950/40 border border-rose-800/40 px-2 py-0.5 rounded-md w-fit">
+                                        ⏳ Pendiente
+                                      </span>
+                                      <span className="text-[10px] text-zinc-500 font-mono mt-0.5">
+                                        Debe ${playerFee.toLocaleString('es-CO')} COP
                                       </span>
                                     </div>
                                   )}
@@ -1649,26 +1827,51 @@ export function MatchSettlementCard({
                                   <TableCell className="text-right">
                                     <div className="flex items-center justify-end gap-1.5 flex-wrap">
                                       {!isCancelled && (
-                                        <Button
-                                          onClick={() => {
-                                            const host = getPlayer(att.playerId);
-                                            const suggested = isAttended && playerFee > 0 ? playerFee : dynamicPitchFee;
-                                            setCashModalPlayer({
-                                              id: att.playerId,
-                                              name: host?.fullName || att.playerId,
-                                              suggestedAmount: suggested,
-                                            });
-                                            setCashAmount(suggested);
-                                            setCashNote(`Pago en efectivo cancha - ${match.location}`);
-                                          }}
-                                          disabled={isPending}
-                                          variant="outline"
-                                          size="sm"
-                                          className="text-xs h-7 px-2 border-emerald-600/40 text-emerald-400 hover:bg-emerald-950/50"
-                                          title="Registrar pago recibido en efectivo"
-                                        >
-                                          💵 Efectivo
-                                        </Button>
+                                        payment.isPaid ? (
+                                          <Button
+                                            onClick={() => {
+                                              const host = getPlayer(att.playerId);
+                                              setCashModalPlayer({
+                                                id: att.playerId,
+                                                name: host?.fullName || att.playerId,
+                                                suggestedAmount: 5000,
+                                              });
+                                              setCashAmount(5000);
+                                              setCashNote(`Abono adicional en efectivo - ${match.location}`);
+                                            }}
+                                            disabled={isPending}
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs h-7 px-2 border-emerald-700/50 text-emerald-400 hover:bg-emerald-950/50"
+                                            title="Registrar abono extra"
+                                          >
+                                            <Coins className="w-3 h-3 mr-1 text-emerald-400" /> +Abonar
+                                          </Button>
+                                        ) : (
+                                          <Button
+                                            onClick={() => {
+                                              const host = getPlayer(att.playerId);
+                                              const suggested = payment.isPartial
+                                                ? payment.pendingAmount
+                                                : (playerFee > 0 ? playerFee : dynamicPitchFee);
+                                              setCashModalPlayer({
+                                                id: att.playerId,
+                                                name: host?.fullName || att.playerId,
+                                                suggestedAmount: suggested,
+                                              });
+                                              setCashAmount(suggested);
+                                              setCashNote(`Pago en efectivo cancha - ${match.location}`);
+                                            }}
+                                            disabled={isPending}
+                                            variant="default"
+                                            size="sm"
+                                            className="text-xs h-7 px-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-sm"
+                                            title="Registrar pago recibido en efectivo"
+                                          >
+                                            <Banknote className="w-3.5 h-3.5 mr-1" />
+                                            {payment.isPartial ? 'Completar $' : '💵 Cobrar $'}
+                                          </Button>
+                                        )
                                       )}
                                       {!isCancelled && !isWaitlist && (
                                         <Button
@@ -1800,7 +2003,7 @@ export function MatchSettlementCard({
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
                   <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
                     <span className="text-zinc-400 block mb-1">Costo Cancha:</span>
                     <span className="text-lg font-mono font-bold text-white">
@@ -1808,16 +2011,79 @@ export function MatchSettlementCard({
                     </span>
                   </div>
                   <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
-                    <span className="text-zinc-400 block mb-1">Cuota Final por Jugador:</span>
+                    <span className="text-zinc-400 block mb-1">Cuota por Jugador:</span>
                     <span className="text-lg font-mono font-bold text-emerald-400">
                       ${basePitchFee.toLocaleString('es-CO')} COP
                     </span>
                   </div>
                   <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
-                    <span className="text-zinc-400 block mb-1">Jugadores que Pagan:</span>
-                    <span className="text-lg font-mono font-bold text-amber-300">
-                      {attendedCount > 0 ? attendedCount : confirmedCount} jugadores
+                    <span className="text-zinc-400 block mb-1">Total Recaudado:</span>
+                    <span className="text-lg font-mono font-bold text-emerald-400">
+                      ${totalCollected.toLocaleString('es-CO')} COP
                     </span>
+                  </div>
+                  <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+                    <span className="text-zinc-400 block mb-1">Pendiente por Cobrar:</span>
+                    <span className={`text-lg font-mono font-bold ${totalRemaining > 0 ? 'text-amber-400' : 'text-zinc-400'}`}>
+                      ${totalRemaining.toLocaleString('es-CO')} COP
+                    </span>
+                  </div>
+                </div>
+
+                {/* Per-player payment breakdown in Finances tab */}
+                <div className="pt-2">
+                  <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
+                    Desglose Individual de Pagos
+                  </h4>
+                  <div className="border border-zinc-800 rounded-xl overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-zinc-800 text-xs">
+                          <TableHead>Jugador</TableHead>
+                          <TableHead>Cuota Liquidada</TableHead>
+                          <TableHead>Pagado</TableHead>
+                          <TableHead>Saldo Pendiente</TableHead>
+                          <TableHead>Estado</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {playingAttendances.map((att) => {
+                          const host = getPlayer(att.playerId);
+                          const isDriver = !!(att.hasVehicle || att.vehiclePlate);
+                          const fee = basePitchFee + (isDriver ? vehicleParkingFee : 0);
+                          const pay = getPlayerPaymentDetails(att.playerId, fee);
+                          const name = att.guestName ? `${att.guestName} (Invitado)` : host?.fullName || att.playerId;
+
+                          return (
+                            <TableRow key={att.id} className="text-xs">
+                              <TableCell className="font-medium text-zinc-200">
+                                ⚽ {name}
+                              </TableCell>
+                              <TableCell className="font-mono">${fee.toLocaleString('es-CO')} COP</TableCell>
+                              <TableCell className="font-mono text-emerald-400 font-bold">
+                                ${pay.totalPaid.toLocaleString('es-CO')} COP
+                              </TableCell>
+                              <TableCell className="font-mono">
+                                {pay.pendingAmount > 0 ? (
+                                  <span className="text-amber-400">${pay.pendingAmount.toLocaleString('es-CO')} COP</span>
+                                ) : (
+                                  <span className="text-zinc-500">$0 COP</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {pay.isPaid ? (
+                                  <Badge variant="success" className="text-[10px]">Al Día ✅</Badge>
+                                ) : pay.isPartial ? (
+                                  <Badge variant="warning" className="text-[10px]">Abono Parcial</Badge>
+                                ) : (
+                                  <Badge variant="destructive" className="text-[10px]">Pendiente</Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
               </Card>
@@ -1932,6 +2198,111 @@ export function MatchSettlementCard({
                 className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-1"
               >
                 {isPending ? 'Guardando...' : 'Confirmar 💵'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Match Cash Payments History Modal */}
+      {showPaymentsHistoryModal && match && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-zinc-900 border border-emerald-500/40 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl relative max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <History className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    Historial de Pagos en Cancha
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    {match.location} • {matchFinancialCredits.length} pagos registrados
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPaymentsHistoryModal(false)}
+                className="text-zinc-400 hover:text-white p-1.5 rounded-full bg-zinc-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* List of Registered Payments */}
+            <div className="overflow-y-auto flex-1 pr-1 space-y-2.5">
+              {matchFinancialCredits.length === 0 ? (
+                <div className="py-12 text-center text-zinc-500 text-xs space-y-2">
+                  <div className="text-3xl">🪙</div>
+                  <p>Aún no se han registrado pagos en efectivo para este partido.</p>
+                  <p className="text-zinc-600 text-[11px]">
+                    Haz clic en el botón <strong>&quot;💵 Cobrar $&quot;</strong> en la tabla de nómina para registrar pagos.
+                  </p>
+                </div>
+              ) : (
+                matchFinancialCredits.map((credit, idx) => {
+                  const player = getPlayer(credit.playerId);
+                  return (
+                    <div
+                      key={credit.id || idx}
+                      className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3 flex items-center justify-between gap-3 text-xs hover:border-zinc-700 transition-colors"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-zinc-100">
+                            ⚽ {player?.fullName || credit.playerId}
+                          </span>
+                          {player?.alias && (
+                            <span className="text-[10px] text-zinc-400 font-normal">
+                              ({player.alias.replace(/^\(+|\)+$/g, '')})
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-zinc-400 flex items-center gap-2">
+                          <span>{credit.note || 'Pago en efectivo cancha'}</span>
+                        </div>
+                        <div className="text-[10px] text-zinc-500">
+                          {new Date(credit.referenceDate || credit.createdAt).toLocaleDateString('es-CO', {
+                            timeZone: 'America/Bogota',
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="font-mono font-bold text-sm text-emerald-400 block">
+                          +${credit.amount.toLocaleString('es-CO')}
+                        </span>
+                        <Badge variant="success" className="text-[9px] py-0 px-1.5 font-mono">
+                          Efectivo
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Total Footer */}
+            <div className="border-t border-zinc-800 pt-3 shrink-0 flex items-center justify-between text-xs">
+              <div>
+                <span className="text-zinc-400 block text-[11px]">Total Recaudado:</span>
+                <span className="text-base font-black font-mono text-emerald-400">
+                  ${totalCollected.toLocaleString('es-CO')} COP
+                </span>
+              </div>
+              <Button
+                type="button"
+                onClick={() => setShowPaymentsHistoryModal(false)}
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs"
+              >
+                Cerrar
               </Button>
             </div>
           </div>

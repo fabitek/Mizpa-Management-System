@@ -72,7 +72,7 @@ export function PublicPlayerPaymentView({
     players.find((p) => p.id === defaultPlayerId) || null
   );
 
-  const [amount, setAmount] = useState<number>(20000);
+  const [amount, setAmount] = useState<number | ''>('');
   const [note, setNote] = useState<string>('Abono cuota fútbol');
   const [receiptUrl, setReceiptUrl] = useState<string>('');
   const [ocrData, setOcrData] = useState<ReceiptOcrResult | null>(null);
@@ -127,7 +127,8 @@ export function PublicPlayerPaymentView({
       setFeedback({ success: false, message: 'Por favor selecciona tu nombre de jugador.' });
       return;
     }
-    if (amount <= 0) {
+    const finalAmount = Number(amount);
+    if (finalAmount <= 0) {
       setFeedback({ success: false, message: 'El monto a abonar debe ser mayor a cero.' });
       return;
     }
@@ -136,7 +137,7 @@ export function PublicPlayerPaymentView({
       try {
         const res = await recordPlayerCreditAction(
           selectedPlayer.id,
-          amount,
+          finalAmount,
           note.trim() || 'Abono por transferencia',
           receiptUrl || undefined
         );
@@ -181,7 +182,7 @@ export function PublicPlayerPaymentView({
             </Badge>
             <h2 className="text-2xl font-bold text-white">¡Abono Registrado con Éxito!</h2>
             <p className="text-sm text-emerald-300 mt-1">
-              Tu transferencia de <strong className="font-mono text-white">${amount.toLocaleString('es-CO')} COP</strong> ha sido procesada y registrada en tu cuenta.
+              Tu transferencia de <strong className="font-mono text-white">${Number(amount).toLocaleString('es-CO')} COP</strong> ha sido procesada y registrada en tu cuenta.
             </p>
           </div>
 
@@ -193,7 +194,7 @@ export function PublicPlayerPaymentView({
             <div className="flex justify-between items-center text-zinc-300 border-b border-zinc-800 pb-2">
               <span className="text-zinc-400">Monto Abonado:</span>
               <span className="text-emerald-400 font-mono font-bold text-sm">
-                ${amount.toLocaleString('es-CO')} COP
+                ${Number(amount).toLocaleString('es-CO')} COP
               </span>
             </div>
             {updatedBalance !== null && (
@@ -445,7 +446,10 @@ export function PublicPlayerPaymentView({
                     min={1000}
                     step={1000}
                     value={amount}
-                    onChange={(e) => setAmount(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAmount(val === '' ? '' : Number(val));
+                    }}
                     className="w-full bg-zinc-950 border border-zinc-700 rounded-xl pl-8 pr-4 py-2.5 text-sm font-mono font-bold text-zinc-100 focus:outline-none focus:border-emerald-500 transition-all"
                   />
                 </div>
@@ -494,7 +498,7 @@ export function PublicPlayerPaymentView({
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  Registrar Abono de ${amount.toLocaleString('es-CO')} COP ⚽
+                  Registrar Abono de ${Number(amount || 0).toLocaleString('es-CO')} COP ⚽
                 </>
               )}
             </Button>

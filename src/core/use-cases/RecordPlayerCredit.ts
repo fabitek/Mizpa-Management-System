@@ -7,6 +7,7 @@ export interface RecordPlayerCreditInput {
   note?: string;
   receiptUrl?: string;
   referenceDate?: Date;
+  matchId?: string | null;
 }
 
 export interface RecordPlayerCreditResult {
@@ -27,7 +28,7 @@ export class RecordPlayerCreditUseCase {
   }
 
   async execute(input: RecordPlayerCreditInput): Promise<RecordPlayerCreditResult> {
-    const { playerId, amount, note, receiptUrl, referenceDate = new Date() } = input;
+    const { playerId, amount, note, receiptUrl, referenceDate = new Date(), matchId } = input;
 
     if (!amount || amount <= 0 || !Number.isFinite(amount)) {
       throw new InvalidFinancialAmountError(
@@ -35,7 +36,7 @@ export class RecordPlayerCreditUseCase {
       );
     }
 
-    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     let entryId = crypto.randomUUID();
     if (this.idGenerator) {
       const gen = this.idGenerator();
@@ -47,7 +48,7 @@ export class RecordPlayerCreditUseCase {
     const entry: FinancialEntry = {
       id: entryId,
       playerId,
-      matchId: null,
+      matchId: matchId || null,
       type: 'CREDIT',
       amount,
       referenceDate,

@@ -2,12 +2,13 @@ import {
   matchRepository,
   attendanceRepository,
   playerRepository,
+  financeRepository,
   calculateMatchFeeUseCase,
   reconcileMatchAttendancesUseCase,
 } from '../../infrastructure/container.ts';
 import { initialPlayers } from '../../infrastructure/seed-data.ts';
 import { MatchSettlementCard } from '../../components/matches/MatchSettlementCard.tsx';
-import type { Match, Player, Attendance } from '../../core/domain/index.ts';
+import type { Match, Player, Attendance, FinancialEntry } from '../../core/domain/index.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,7 @@ export default async function MatchesPage() {
   let allMatches: Match[] = [];
   let dbPlayers: Player[] = [];
   let attendances: Attendance[] = [];
+  let financialEntries: FinancialEntry[] = [];
 
   try {
     allMatches = await matchRepository.findAll();
@@ -26,6 +28,12 @@ export default async function MatchesPage() {
     dbPlayers = await playerRepository.findAll();
   } catch (err) {
     console.warn('MatchesPage playerRepository.findAll warning:', err);
+  }
+
+  try {
+    financialEntries = await financeRepository.getAllEntries();
+  } catch (err) {
+    console.warn('MatchesPage financeRepository.getAllEntries warning:', err);
   }
 
   const sortedMatches = [...allMatches].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -62,6 +70,7 @@ export default async function MatchesPage() {
         initialAttendances={attendances}
         players={playersList}
         estimatedFee={estimatedFee}
+        initialFinancialEntries={financialEntries}
       />
     </main>
   );
