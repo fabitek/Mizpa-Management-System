@@ -72,7 +72,7 @@ export function PublicPlayerPaymentView({
     players.find((p) => p.id === defaultPlayerId) || null
   );
 
-  const [amount, setAmount] = useState<number | ''>('');
+  const [amount, setAmount] = useState<number | ''>(8500);
   const [note, setNote] = useState<string>('Abono cuota fútbol');
   const [receiptUrl, setReceiptUrl] = useState<string>('');
   const [ocrData, setOcrData] = useState<ReceiptOcrResult | null>(null);
@@ -113,9 +113,7 @@ export function PublicPlayerPaymentView({
     if (data.ocrResult) {
       setOcrData(data.ocrResult);
     }
-    if (data.suggestedAmount && data.suggestedAmount > 0) {
-      setAmount(data.suggestedAmount);
-    }
+    // Amount is now locked to 8500, ignore OCR suggested amount
     if (data.suggestedNote) {
       setNote(data.suggestedNote);
     }
@@ -127,9 +125,11 @@ export function PublicPlayerPaymentView({
       setFeedback({ success: false, message: 'Por favor selecciona tu nombre de jugador.' });
       return;
     }
-    const finalAmount = Number(amount);
-    if (finalAmount <= 0) {
-      setFeedback({ success: false, message: 'El monto a abonar debe ser mayor a cero.' });
+    
+    // Strict validation: Only allow 8500
+    const finalAmount = 8500;
+    if (Number(amount) !== 8500) {
+      setFeedback({ success: false, message: 'El sistema solo permite abonos exactos de $8.500 COP por seguridad.' });
       return;
     }
 
@@ -439,19 +439,17 @@ export function PublicPlayerPaymentView({
               <div>
                 <label className="text-xs text-zinc-400 block mb-1">Monto a Transferir ($ COP):</label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-400 font-bold">$</span>
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-500 font-bold">$</span>
                   <input
                     type="number"
                     required
-                    min={1000}
-                    step={1000}
-                    value={amount}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setAmount(val === '' ? '' : Number(val));
-                    }}
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-xl pl-8 pr-4 py-2.5 text-sm font-mono font-bold text-zinc-100 focus:outline-none focus:border-emerald-500 transition-all"
+                    value={8500}
+                    readOnly
+                    className="w-full bg-zinc-950/50 border border-emerald-900/50 rounded-xl pl-8 pr-4 py-2.5 text-sm font-mono font-bold text-emerald-400 focus:outline-none cursor-not-allowed opacity-90 transition-all"
                   />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-emerald-500/70 uppercase font-bold tracking-wider">
+                    Fijo
+                  </div>
                 </div>
               </div>
 

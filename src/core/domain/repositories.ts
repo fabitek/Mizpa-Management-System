@@ -45,6 +45,7 @@ export interface IFinanceRepository {
   getEntriesByMatchId(matchId: string): Promise<FinancialEntry[]>;
   getAllEntries(): Promise<FinancialEntry[]>;
   getPlayerBalance(playerId: string): Promise<number>;
+  deleteEntry(id: string): Promise<void>;
 }
 
 export interface IOperatingExpenseRepository {

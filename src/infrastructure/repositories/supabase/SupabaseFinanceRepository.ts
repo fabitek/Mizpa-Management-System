@@ -207,4 +207,18 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
       return 0;
     }
   }
+
+  async deleteEntry(id: string): Promise<void> {
+    globalFinanceCache.delete(id);
+    if (!id || !UUID_REGEX.test(id)) return;
+
+    try {
+      const { error } = await this.client.from('financial_entries').delete().eq('id', id);
+      if (error) {
+        console.warn(`Supabase deleteEntry warning for '${id}':`, error.message);
+      }
+    } catch (err) {
+      console.warn(`Supabase deleteEntry exception for '${id}':`, err);
+    }
+  }
 }

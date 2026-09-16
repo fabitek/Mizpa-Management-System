@@ -12,6 +12,7 @@ import { OperatingExpensesCard } from './OperatingExpensesCard.tsx';
 import {
   recordPlayerCreditAction,
   getPlayerStatementAction,
+  deleteFinancialEntryAction,
 } from '../../app/actions/finance-actions.ts';
 import type { Player } from '../../core/domain/index.ts';
 import type {
@@ -38,6 +39,7 @@ import {
   X,
   Sparkles,
   Share2,
+  Trash2,
 } from 'lucide-react';
 
 interface PlayerWalletViewProps {
@@ -121,6 +123,19 @@ export function PlayerWalletView({
         setCreditNote('');
         setReceiptUrl('');
         setOcrDetectedBadge(null);
+      }
+    });
+  };
+
+  const handleDeleteEntry = (entryId: string) => {
+    startTransition(async () => {
+      const res = await deleteFinancialEntryAction(entryId);
+      setFeedback(res);
+      if (res.success) {
+        const stmtRes = await getPlayerStatementAction(selectedPlayerId);
+        if (stmtRes.success && stmtRes.data) {
+          setStatement(stmtRes.data as any);
+        }
       }
     });
   };
@@ -445,6 +460,7 @@ export function PlayerWalletView({
                           <TableHead>Concepto / Detalle</TableHead>
                           <TableHead className="text-center">Comprobante</TableHead>
                           <TableHead className="text-right">Monto</TableHead>
+                          <TableHead className="text-right">Acción</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -489,6 +505,19 @@ export function PlayerWalletView({
                                 }`}
                               >
                                 {isCredit ? '+' : '-'}${entry.amount.toLocaleString('es-CO')}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {isCredit && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteEntry(entry.id)}
+                                    disabled={isPending}
+                                    className="text-zinc-500 hover:text-red-400 p-1 rounded transition-colors"
+                                    title="Anular / Eliminar abono erróneo"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 inline" />
+                                  </button>
+                                )}
                               </TableCell>
                             </TableRow>
                           );

@@ -57,6 +57,11 @@ export class InMemoryFinanceRepository implements IFinanceRepository {
     }, 0);
   }
 
+  async deleteEntry(id: string): Promise<void> {
+    this.entries = this.entries.filter((e) => e.id !== id);
+    this.persist();
+  }
+
   // Helper for UI/testing
   async findAll(): Promise<FinancialEntry[]> {
     return this.entries.map((e) => ({ ...e }));

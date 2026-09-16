@@ -274,3 +274,25 @@ export async function parseReceiptOcrAction(
   }
 }
 
+export async function deleteFinancialEntryAction(
+  entryId: string
+): Promise<FinancialActionResult> {
+  try {
+    await container.financeRepository.deleteEntry(entryId);
+    revalidatePath('/wallet');
+    revalidatePath('/matches');
+
+    return {
+      success: true,
+      message: 'Registro financiero eliminado con éxito.',
+    };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error al eliminar el registro financiero.',
+      errorCode: 'DELETE_FINANCIAL_ENTRY_ERROR',
+    };
+  }
+}
+
+

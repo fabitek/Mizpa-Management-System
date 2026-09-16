@@ -21,7 +21,7 @@ import {
   checkinAttendanceAction,
   updateAttendanceGuestTypeAction,
 } from '../../app/actions/rsvp-actions.ts';
-import { recordPlayerCreditAction } from '../../app/actions/finance-actions.ts';
+import { recordPlayerCreditAction, deleteFinancialEntryAction } from '../../app/actions/finance-actions.ts';
 import type { Match, Attendance, Player, MatchStatus, ConfirmedRosterEntry, FinancialEntry } from '../../core/domain/index.ts';
 import {
   formatWhatsAppGroupCapacityMessage,
@@ -441,6 +441,16 @@ export function MatchSettlementCard({
           setFinancialEntries((prev) => [newEntry, ...prev]);
         }
         setCashModalPlayer(null);
+      }
+    });
+  };
+
+  const handleDeleteFinancialEntry = (entryId: string) => {
+    startTransition(async () => {
+      const res = await deleteFinancialEntryAction(entryId);
+      setFeedback(res);
+      if (res.success) {
+        setFinancialEntries((prev) => prev.filter((e) => e.id !== entryId));
       }
     });
   };
@@ -2275,13 +2285,26 @@ export function MatchSettlementCard({
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <span className="font-mono font-bold text-sm text-emerald-400 block">
-                          +${credit.amount.toLocaleString('es-CO')}
-                        </span>
-                        <Badge variant="success" className="text-[9px] py-0 px-1.5 font-mono">
-                          Efectivo
-                        </Badge>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-sm text-emerald-400 block">
+                            +${credit.amount.toLocaleString('es-CO')}
+                          </span>
+                          <Badge variant="success" className="text-[9px] py-0 px-1.5 font-mono">
+                            Efectivo
+                          </Badge>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={isPending}
+                          onClick={() => handleDeleteFinancialEntry(credit.id)}
+                          className="h-8 w-8 p-0 text-zinc-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg"
+                          title="Eliminar este abono/pago"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
                     </div>
                   );
