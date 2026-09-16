@@ -456,12 +456,9 @@ export function MatchSettlementCard({
   };
 
   const getPlayerPaymentDetails = (playerId: string, playerFee: number) => {
+    // Include all CREDIT entries for this player (cash, transfer, Nequi, etc.)
     const playerCredits = financialEntries.filter(
-      (e) =>
-        e.type === 'CREDIT' &&
-        e.playerId === playerId &&
-        (e.matchId === match?.id ||
-          (match && e.note && e.note.toLowerCase().includes(match.location.toLowerCase())))
+      (e) => e.type === 'CREDIT' && e.playerId === playerId
     );
     const totalPaid = playerCredits.reduce((sum, e) => sum + e.amount, 0);
     const isPaid = playerFee > 0 ? totalPaid >= playerFee : totalPaid > 0;
@@ -491,7 +488,7 @@ export function MatchSettlementCard({
     (e) =>
       e.type === 'CREDIT' &&
       (e.matchId === match?.id ||
-        (match && e.note && e.note.toLowerCase().includes(match.location.toLowerCase())))
+        playingAttendances.some((att) => att.playerId === e.playerId))
   );
 
   const totalCollected = matchFinancialCredits.reduce((acc, e) => acc + e.amount, 0);
@@ -1654,7 +1651,7 @@ export function MatchSettlementCard({
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                          Recaudo en Cancha (Efectivo & Abonos)
+                          Recaudos & Transferencias (Nequi & Efectivo)
                         </h3>
                         <Badge
                           variant={paidPlayersCount === playingAttendances.length && playingAttendances.length > 0 ? 'success' : 'default'}
@@ -1664,7 +1661,7 @@ export function MatchSettlementCard({
                         </Badge>
                       </div>
                       <p className="text-xs text-zinc-400">
-                        Control en tiempo real de pagos registrados por cada jugador.
+                        Control en tiempo real de pagos y transferencias registradas por cada jugador.
                       </p>
                     </div>
                   </div>
@@ -2043,7 +2040,7 @@ export function MatchSettlementCard({
                 {/* Per-player payment breakdown in Finances tab */}
                 <div className="pt-2">
                   <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
-                    Desglose Individual de Pagos
+                    Desglose Individual de Pagos & Transferencias
                   </h4>
                   <div className="border border-zinc-800 rounded-xl overflow-hidden">
                     <Table>
@@ -2051,8 +2048,9 @@ export function MatchSettlementCard({
                         <TableRow className="border-zinc-800 text-xs">
                           <TableHead>Jugador</TableHead>
                           <TableHead>Cuota Liquidada</TableHead>
-                          <TableHead>Pagado</TableHead>
+                          <TableHead>Total Pagado</TableHead>
                           <TableHead>Saldo Pendiente</TableHead>
+                          <TableHead>Método / Concepto</TableHead>
                           <TableHead>Estado</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -2063,6 +2061,8 @@ export function MatchSettlementCard({
                           const fee = basePitchFee + (isDriver ? vehicleParkingFee : 0);
                           const pay = getPlayerPaymentDetails(att.playerId, fee);
                           const name = att.guestName ? `${att.guestName} (Invitado)` : host?.fullName || att.playerId;
+                          const hasTransfer = pay.credits.some(c => c.receiptUrl || /nequi|transf|bancolombia|aporte/i.test(c.note || ''));
+                          const hasCash = pay.credits.some(c => /efectivo/i.test(c.note || ''));
 
                           return (
                             <TableRow key={att.id} className="text-xs">
@@ -2075,9 +2075,26 @@ export function MatchSettlementCard({
                               </TableCell>
                               <TableCell className="font-mono">
                                 {pay.pendingAmount > 0 ? (
-                                  <span className="text-amber-400">${pay.pendingAmount.toLocaleString('es-CO')} COP</span>
+                                  <span className="text-amber-400 font-bold">${pay.pendingAmount.toLocaleString('es-CO')} COP</span>
                                 ) : (
                                   <span className="text-zinc-500">$0 COP</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {pay.credits.length === 0 ? (
+                                  <span className="text-zinc-500 text-[11px]">Sin abonos</span>
+                                ) : hasTransfer && hasCash ? (
+                                  <Badge variant="outline" className="text-[10px] border-purple-700 text-purple-300 bg-purple-950/40">
+                                    💳 Nequi + 💵 Efectivo
+                                  </Badge>
+                                ) : hasTransfer ? (
+                                  <Badge variant="outline" className="text-[10px] border-purple-700 text-purple-300 bg-purple-950/40">
+                                    💳 Transferencia Nequi
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] border-emerald-700 text-emerald-300 bg-emerald-950/40">
+                                    💵 Efectivo
+                                  </Badge>
                                 )}
                               </TableCell>
                               <TableCell>
@@ -2225,7 +2242,7 @@ export function MatchSettlementCard({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    Historial de Pagos en Cancha
+                    Historial de Recaudos & Transferencias
                   </h3>
                   <p className="text-xs text-zinc-400">
                     {match.location} • {matchFinancialCredits.length} pagos registrados
@@ -2246,14 +2263,16 @@ export function MatchSettlementCard({
               {matchFinancialCredits.length === 0 ? (
                 <div className="py-12 text-center text-zinc-500 text-xs space-y-2">
                   <div className="text-3xl">🪙</div>
-                  <p>Aún no se han registrado pagos en efectivo para este partido.</p>
+                  <p>Aún no se han registrado pagos o transferencias para este partido.</p>
                   <p className="text-zinc-600 text-[11px]">
-                    Haz clic en el botón <strong>&quot;💵 Cobrar $&quot;</strong> en la tabla de nómina para registrar pagos.
+                    Los pagos por Nequi o efectivo en cancha aparecerán aquí automáticamente.
                   </p>
                 </div>
               ) : (
                 matchFinancialCredits.map((credit, idx) => {
                   const player = getPlayer(credit.playerId);
+                  const isTransfer = /nequi|transf|bancolombia|aporte/i.test(credit.note || '') || credit.receiptUrl;
+
                   return (
                     <div
                       key={credit.id || idx}
@@ -2271,7 +2290,7 @@ export function MatchSettlementCard({
                           )}
                         </div>
                         <div className="text-[11px] text-zinc-400 flex items-center gap-2">
-                          <span>{credit.note || 'Pago en efectivo cancha'}</span>
+                          <span>{credit.note || (isTransfer ? 'Transferencia digital' : 'Pago en efectivo')}</span>
                         </div>
                         <div className="text-[10px] text-zinc-500">
                           {new Date(credit.referenceDate || credit.createdAt).toLocaleDateString('es-CO', {
@@ -2290,9 +2309,15 @@ export function MatchSettlementCard({
                           <span className="font-mono font-bold text-sm text-emerald-400 block">
                             +${credit.amount.toLocaleString('es-CO')}
                           </span>
-                          <Badge variant="success" className="text-[9px] py-0 px-1.5 font-mono">
-                            Efectivo
-                          </Badge>
+                          {isTransfer ? (
+                            <Badge variant="outline" className="text-[9px] py-0 px-1.5 font-mono border-purple-700 text-purple-300 bg-purple-950/40">
+                              💳 Nequi / Transf
+                            </Badge>
+                          ) : (
+                            <Badge variant="success" className="text-[9px] py-0 px-1.5 font-mono">
+                              💵 Efectivo
+                            </Badge>
+                          )}
                         </div>
                         <Button
                           type="button"
