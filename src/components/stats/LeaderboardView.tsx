@@ -262,7 +262,7 @@ export function LeaderboardView({
           <div className="flex flex-col sm:flex-row items-end justify-center gap-4 sm:gap-6 pt-6">
             {/* 2nd Place */}
             <div className="flex flex-col items-center order-2 sm:order-1 w-full sm:w-44">
-              <div className="w-14 h-14 rounded-full bg-zinc-800 border-2 border-slate-300 flex items-center justify-center text-xl shadow-lg mb-2">
+              <div className="w-14 h-14 rounded-full bg-zinc-800 border-2 border-zinc-300 flex items-center justify-center text-xl shadow-lg mb-2">
                 🥈
               </div>
               <p className="font-bold text-sm text-zinc-200 truncate w-full text-center">
@@ -271,8 +271,8 @@ export function LeaderboardView({
               <p className="text-xs text-zinc-400 font-mono">
                 {top2 ? `${top2.goals} Goles` : '-'}
               </p>
-              <div className="w-full h-24 bg-gradient-to-t from-slate-600/30 to-slate-500/10 rounded-t-lg border-t border-slate-400/40 flex items-center justify-center mt-2">
-                <span className="font-bold text-slate-300 text-lg">2°</span>
+              <div className="w-full h-24 bg-gradient-to-t from-zinc-600/30 to-zinc-500/10 rounded-t-lg border-t border-zinc-400/40 flex items-center justify-center mt-2">
+                <span className="font-bold text-zinc-300 text-lg">2°</span>
               </div>
             </div>
 
