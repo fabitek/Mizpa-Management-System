@@ -126,6 +126,10 @@ export class InMemoryFinanceRepository implements IFinanceRepository {
     return this.entries.map((e) => ({ ...e }));
   }
 
+  async deleteEntry(entryId: string): Promise<void> {
+    this.entries = this.entries.filter((e) => e.id !== entryId);
+  }
+
   async getPlayerBalance(playerId: string): Promise<number> {
     const playerEntries = await this.getEntriesByPlayerId(playerId);
     return playerEntries.reduce((acc, entry) => {
