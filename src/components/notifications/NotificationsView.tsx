@@ -1385,10 +1385,10 @@ export function NotificationsView({
             <Card className="border-zinc-800 bg-zinc-900/60 flex flex-col justify-between">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 text-rose-400">
-                  <AlertTriangle className="w-4 h-4" /> 2. Recordatorio de Cartera en Mora (General)
+                  <AlertTriangle className="w-4 h-4" /> 2. Recordatorio de Cartera (Reserva de Cancha)
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Mensaje con saldo acumulado de cartera y link al portal de pagos.
+                  Mensaje con saldo pendiente para realizar el pago de la reserva del próximo partido.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
