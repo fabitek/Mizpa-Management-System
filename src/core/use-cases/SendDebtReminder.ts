@@ -26,8 +26,10 @@ export class SendDebtReminderUseCase {
     const content =
       `⚠️ *RECORDATORIO DE CUOTA PENDIENTE - MIZPA FC*\n\n` +
       `Hola! Registramos un saldo pendiente de *$${debtAmount.toLocaleString('es-CO')} COP* por tus partidos jugados.\n\n` +
-      `Por favor realiza tu abono vía Nequi/Daviplata para mantener tu estado solvente y asegurar tus próximos cupos.\n\n` +
-      `🔗 Consulta el detalle en tu billetera.`;
+      `💳 *Paga o reporta tu comprobante aquí:*\n` +
+      `👉 https://mizpa-fc.vercel.app/pago?player=${playerId}\n\n` +
+      `🟣 *Nequi / 🔴 Daviplata:* 312 357 8415 (Cesar Tellez)\n\n` +
+      `_Por favor realiza tu transferencia para mantener tu cupo activo._`;
 
     return await this.notificationService.sendNotification({
       recipientPlayerId: playerId,

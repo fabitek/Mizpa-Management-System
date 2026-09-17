@@ -16,7 +16,7 @@ import {
 } from '../../app/actions/notification-actions.ts';
 import { copyToClipboard as safeCopyToClipboard } from '../../core/utils/clipboard.ts';
 import { deleteMatchAction } from '../../app/actions/match-actions.ts';
-import type { Player, Match, NotificationMessage, CheckAndNotifyCapacityResult } from '../../core/domain/types.ts';
+import type { Player, Match, NotificationMessage, CheckAndNotifyCapacityResult, Attendance, FinancialEntry } from '../../core/domain/types.ts';
 import {
   Bell,
   MessageSquare,
@@ -40,6 +40,9 @@ import {
   FileText,
   Flame,
   Check,
+  Car,
+  Receipt,
+  CreditCard,
 } from 'lucide-react';
 
 interface NotificationsViewProps {
@@ -47,6 +50,8 @@ interface NotificationsViewProps {
   matches?: Match[];
   activeMatch: Match | null;
   initialNotifications: NotificationMessage[];
+  initialAttendances?: Attendance[];
+  initialFinancialEntries?: FinancialEntry[];
 }
 
 export function NotificationsView({
@@ -54,6 +59,8 @@ export function NotificationsView({
   matches,
   activeMatch,
   initialNotifications,
+  initialAttendances = [],
+  initialFinancialEntries = [],
 }: NotificationsViewProps) {
   const [activeTab, setActiveTab] = useState<'group-convocation' | 'quorum-10' | 'direct' | 'history'>('group-convocation');
   const [notifications, setNotifications] = useState<NotificationMessage[]>(initialNotifications);
@@ -63,7 +70,11 @@ export function NotificationsView({
     matches && matches.length > 0 ? matches : activeMatch ? [activeMatch] : []
   );
 
-  // Selected Match for convocation
+  const [attendances, setAttendances] = useState<Attendance[]>(initialAttendances);
+  const [financialEntries, setFinancialEntries] = useState<FinancialEntry[]>(initialFinancialEntries);
+  const [sentPlayerIds, setSentPlayerIds] = useState<string[]>([]);
+
+  // Selected Match for convocation & settlement
   const [selectedMatchId, setSelectedMatchId] = useState<string>(
     activeMatch?.id || matches?.[0]?.id || ''
   );
@@ -133,17 +144,98 @@ export function NotificationsView({
     }
   }, []);
 
-  // Web app URL for the RSVP registration form (uses current browser domain/port automatically)
+  // Web app URL for RSVP & Payment portal
   const baseDomain =
     origin ||
     (typeof window !== 'undefined'
       ? window.location.origin
       : process.env.NEXT_PUBLIC_SITE_URL || 'https://mizpa-fc.vercel.app');
   const rsvpUrl = currentMatch ? `${baseDomain.replace(/\/+$/, '')}/rsvp/${currentMatch.id}` : baseDomain;
+  const paymentPortalUrl = `${baseDomain.replace(/\/+$/, '')}/pago`;
 
-  const estFee = currentMatch
-    ? Math.ceil((currentMatch.pitchRentalCost + (currentMatch.extraCosts || 0)) / (currentMatch.maxPlayers || 18))
+  // Dynamic match calculations
+  const matchAttendances = attendances.filter((a) => a.matchId === currentMatch?.id);
+  const playingAttendances = matchAttendances.filter(
+    (a) => a.guestType !== 'COMPANION' && a.status !== 'CANCELLED'
+  );
+  const attendedCount = matchAttendances.filter(
+    (a) => a.status === 'ATTENDED' && a.guestType !== 'COMPANION'
+  ).length;
+  const confirmedCount = matchAttendances.filter(
+    (a) => (a.status === 'CONFIRMED' || a.status === 'ATTENDED') && a.guestType !== 'COMPANION'
+  ).length;
+
+  const durationHours = currentMatch?.durationHours ?? 2;
+  const parkingFeePerHour = currentMatch?.parkingFeePerHour ?? 1000;
+  const vehicleParkingFee = durationHours * parkingFeePerHour;
+  const isSettled = currentMatch?.status === 'SETTLED';
+
+  const fullCapacityPitchFee = currentMatch
+    ? Math.ceil(currentMatch.pitchRentalCost / (currentMatch.maxPlayers || 18))
     : 0;
+
+  const basePitchFee = currentMatch
+    ? isSettled
+      ? (currentMatch.settledFeePerPlayer ?? (attendedCount > 0 ? Math.ceil(currentMatch.pitchRentalCost / attendedCount) : fullCapacityPitchFee))
+      : attendedCount > 0
+      ? Math.ceil(currentMatch.pitchRentalCost / attendedCount)
+      : confirmedCount > 0
+      ? Math.ceil(currentMatch.pitchRentalCost / confirmedCount)
+      : fullCapacityPitchFee
+    : 0;
+
+  const estFee = basePitchFee > 0 ? basePitchFee : fullCapacityPitchFee;
+
+  // Helper to compute a player's fee, attendances, and balance
+  const getPlayerMatchBreakdown = (playerId: string) => {
+    const playerAtt = matchAttendances.find((a) => a.playerId === playerId && a.status !== 'CANCELLED');
+    const guestAtts = matchAttendances.filter((a) => a.registeredByPlayerId === playerId && a.status !== 'CANCELLED');
+
+    const isAttending = !!playerAtt;
+    const isPlaying = playerAtt ? playerAtt.guestType !== 'COMPANION' : false;
+    const hasVehicle = !!(playerAtt?.hasVehicle || playerAtt?.vehiclePlate);
+    const vehiclePlate = playerAtt?.vehiclePlate;
+
+    const pitchFee = isPlaying ? basePitchFee : 0;
+    const parkingFee = hasVehicle ? vehicleParkingFee : 0;
+
+    const guestPlayers = guestAtts.filter((g) => g.guestType !== 'COMPANION');
+    const guestsFee = guestPlayers.length * basePitchFee;
+
+    const totalTargetFee = pitchFee + parkingFee + guestsFee;
+
+    // Credits for this player (all payments)
+    const playerCredits = financialEntries.filter((e) => e.type === 'CREDIT' && e.playerId === playerId);
+    const totalPaid = playerCredits.reduce((s, e) => s + e.amount, 0);
+
+    // Debits for this player (all debts)
+    const playerDebits = financialEntries.filter((e) => e.type === 'DEBIT' && e.playerId === playerId);
+    const totalDebits = playerDebits.reduce((s, e) => s + e.amount, 0);
+    const walletBalance = totalPaid - totalDebits;
+
+    const isPaid = totalTargetFee > 0 ? totalPaid >= totalTargetFee : (isAttending ? totalPaid > 0 : true);
+    const isPartial = totalPaid > 0 && totalPaid < totalTargetFee;
+    const pendingAmount = Math.max(0, totalTargetFee - totalPaid);
+
+    return {
+      playerAtt,
+      guestAtts,
+      guestPlayers,
+      hasVehicle,
+      vehiclePlate,
+      isAttending,
+      isPlaying,
+      pitchFee,
+      parkingFee,
+      guestsFee,
+      totalTargetFee,
+      totalPaid,
+      pendingAmount,
+      isPaid,
+      isPartial,
+      walletBalance,
+    };
+  };
 
   const formattedDate = currentMatch
     ? new Date(currentMatch.date).toLocaleString('es-CO', {
@@ -188,17 +280,113 @@ export function NotificationsView({
       `⚠️ _Cupos por orden de llegada. Los siguientes pasan a lista de espera._`
     : '';
 
-  const feeSettledText = currentMatch
-    ? `💰 *LIQUIDACIÓN DE CUOTA • MIZPA FC* ⚽\n\n` +
-      `Partido liquidado en *${currentMatch.location}*.\n\n` +
-      `💵 *Cuota asignada:* $${(currentMatch.settledFeePerPlayer || estFee).toLocaleString('es-CO')} COP\n` +
-      `💳 Realiza tu transferencia (Nequi / Daviplata) y sube tu comprobante a la billetera.`
-    : '';
+  // Generate customized 1-to-1 Match Fee Notification
+  const generatePlayerSettlementMessage = (player: Player) => {
+    if (!currentMatch) return '';
+    const info = getPlayerMatchBreakdown(player.id);
+    const feeToPay = info.totalTargetFee > 0 ? info.totalTargetFee : basePitchFee;
+    const playerPaymentLink = `${baseDomain.replace(/\/+$/, '')}/pago?player=${player.id}`;
 
-  const debtReminderText = selectedPlayer
-    ? `⚠️ *RECORDATORIO DE PAGO • MIZPA FC* ⚽\n\n` +
-      `Hola ${selectedPlayer.fullName}, te recordamos realizar tu pago pendiente de partidos anteriores para mantener tu cupo activo.`
-    : '';
+    const detailLines: string[] = [];
+    detailLines.push(`• Cancha: $${(info.pitchFee || basePitchFee).toLocaleString('es-CO')} COP`);
+    if (info.hasVehicle) {
+      detailLines.push(`• Parqueadero (${durationHours}h): $${info.parkingFee.toLocaleString('es-CO')} COP${info.vehiclePlate ? ` [Placa ${info.vehiclePlate}]` : ''}`);
+    }
+    if (info.guestPlayers.length > 0) {
+      const guestNames = info.guestPlayers.map((g) => g.guestName || 'Invitado').join(', ');
+      detailLines.push(`• Invitado(s) (${guestNames}): $${info.guestsFee.toLocaleString('es-CO')} COP`);
+    }
+
+    const statusLine = info.isPaid
+      ? '✅ Pago al día / Confirmado'
+      : info.isPartial
+      ? `⚠️ Abono parcial: $${info.totalPaid.toLocaleString('es-CO')} COP (Resta por pagar $${info.pendingAmount.toLocaleString('es-CO')} COP)`
+      : `🔴 Pendiente por pagar: $${feeToPay.toLocaleString('es-CO')} COP`;
+
+    return (
+      `💰 *LIQUIDACIÓN DE CUOTA • MIZPA FC* ⚽\n\n` +
+      `Hola *${player.fullName}*, te compartimos el cobro oficial de tu cuota de fútbol:\n\n` +
+      `📍 *Sede:* ${currentMatch.location}${currentMatch.locationAddress ? ` (${currentMatch.locationAddress})` : ''}\n` +
+      `📅 *Fecha:* ${formattedDate}\n\n` +
+      `💵 *Detalle de tu Cuota:*\n` +
+      detailLines.join('\n') + `\n` +
+      `👉 *TOTAL A PAGAR:* $${feeToPay.toLocaleString('es-CO')} COP\n` +
+      `📊 *Estado:* ${statusLine}\n\n` +
+      `💳 *PORTAL DE PAGOS & TRANSFERENCIAS:*\n` +
+      `Paga vía Nequi / Daviplata y reporta tu comprobante aquí:\n` +
+      `👉 ${playerPaymentLink}\n\n` +
+      `🟣 *Nequi / 🔴 Daviplata:* 312 357 8415\n` +
+      `👤 *Titular:* Cesar Tellez\n\n` +
+      `_Por favor sube tu comprobante para registrar tu pago en el sistema._`
+    );
+  };
+
+  // Generate WhatsApp Group Broadcast with list of unpaid players (1-Click)
+  const generateGroupSettlementDebtorsMessage = () => {
+    if (!currentMatch) return '';
+    const matchAttendees = playingAttendances.map((att) => {
+      const p = getPlayer(att.playerId);
+      const info = getPlayerMatchBreakdown(att.playerId);
+      return { att, player: p, info };
+    });
+
+    const unpaid = matchAttendees.filter((item) => !item.info.isPaid);
+    const paid = matchAttendees.filter((item) => item.info.isPaid);
+    const generalPaymentLink = `${baseDomain.replace(/\/+$/, '')}/pago`;
+
+    let text = `💰 *ESTADO DE CUOTAS Y PAGOS • MIZPA FC* ⚽\n\n`;
+    text += `📍 *Partido:* ${currentMatch.location}\n`;
+    text += `📅 *Fecha:* ${formattedDate}\n`;
+    text += `💵 *Cuota base:* $${basePitchFee.toLocaleString('es-CO')} COP\n\n`;
+
+    if (unpaid.length > 0) {
+      text += `🔴 *PENDIENTES POR PAGAR (${unpaid.length} jugadores):*\n`;
+      unpaid.forEach((item, idx) => {
+        const name = item.player ? item.player.fullName : (item.att.guestName || 'Jugador');
+        const amount = item.info.pendingAmount > 0 ? item.info.pendingAmount : (item.info.totalTargetFee || basePitchFee);
+        const extras = item.info.hasVehicle ? ' (+Parqueadero)' : item.info.guestPlayers.length > 0 ? ' (+Invitado)' : '';
+        text += `${idx + 1}. ❌ *${name}* — $${amount.toLocaleString('es-CO')} COP${extras}\n`;
+      });
+      text += `\n`;
+    } else {
+      text += `🎉 *¡EXCELENTE! TODOS LOS JUGADORES ESTÁN AL DÍA* ✅\n\n`;
+    }
+
+    if (paid.length > 0) {
+      text += `✅ *PAGOS CONFIRMADOS (${paid.length}):*\n`;
+      text += paid.map((item) => `• ${item.player?.fullName || item.att.guestName || 'Jugador'} ($${(item.info.totalPaid || item.info.totalTargetFee || basePitchFee).toLocaleString('es-CO')}) ✅`).join('\n') + `\n\n`;
+    }
+
+    text += `💳 *PORTAL OFICIAL DE PAGOS & TRANSFERENCIAS:*\n`;
+    text += `Realiza tu transferencia y sube tu comprobante en:\n`;
+    text += `👉 ${generalPaymentLink}\n\n`;
+    text += `🟣 *Nequi / 🔴 Daviplata:* 312 357 8415\n`;
+    text += `👤 *Titular:* Cesar Tellez\n\n`;
+    text += `⚠️ _Agradecemos a los jugadores pendientes ponerse al día hoy mismo._`;
+
+    return text;
+  };
+
+  // Generate general debt reminder message
+  const generateDebtReminderMessage = (player: Player) => {
+    const info = getPlayerMatchBreakdown(player.id);
+    const totalDebt = info.walletBalance < 0 ? Math.abs(info.walletBalance) : info.pendingAmount > 0 ? info.pendingAmount : basePitchFee;
+    const playerPaymentLink = `${baseDomain.replace(/\/+$/, '')}/pago?player=${player.id}`;
+
+    return (
+      `⚠️ *RECORDATORIO DE CARTERA • MIZPA FC* ⚽\n\n` +
+      `Hola *${player.fullName}*, te recordamos que tienes un saldo pendiente acumulado de *$${totalDebt.toLocaleString('es-CO')} COP* por concepto de partidos de fútbol.\n\n` +
+      `💳 *Paga o reporta tu comprobante aquí:*\n` +
+      `👉 ${playerPaymentLink}\n\n` +
+      `🟣 *Nequi / 🔴 Daviplata:* 312 357 8415\n` +
+      `👤 *Titular:* Cesar Tellez\n\n` +
+      `_Agradecemos tu pago oportuno para mantener tu cupo activo en las próximas convocatorias._`
+    );
+  };
+
+  const feeSettledText = selectedPlayer ? generatePlayerSettlementMessage(selectedPlayer) : '';
+  const debtReminderText = selectedPlayer ? generateDebtReminderMessage(selectedPlayer) : '';
+  const groupSettlementDebtorsText = generateGroupSettlementDebtorsMessage();
 
   const handleShareGroupWhatsApp = () => {
     if (!currentMatch) {
@@ -793,14 +981,282 @@ export function NotificationsView({
       {/* Tab 3: 1-to-1 Fees & Debtors */}
       {activeTab === 'direct' && (
         <div className="space-y-6">
-          {/* Target Player Selector */}
+          {/* Match Selector & Overview for Settlements */}
+          {matchList && matchList.length > 0 && (
+            <Card className="border-amber-800/40 bg-gradient-to-b from-amber-950/20 to-zinc-900/60 shadow-xl">
+              <CardHeader className="pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="text-base sm:text-lg flex items-center gap-2 text-white">
+                    <DollarSign className="w-5 h-5 text-amber-400" />
+                    Liquidación de Cuotas, Enlaces de Pago & Cobro a Deudores
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    {isSettled ? (
+                      <Badge variant="success" className="font-mono text-xs">
+                        ✅ Partido Liquidado
+                      </Badge>
+                    ) : (
+                      <Badge variant="warning" className="font-mono text-xs">
+                        ⏳ En Progreso / Proyectado
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <CardDescription className="text-xs text-zinc-300">
+                  Calcula la cuota exacta de cada jugador (cancha + parqueadero + invitados), genera su enlace directo al <strong>Portal de Pagos</strong> y permite cobrar en <strong>1 solo clic</strong> a todo el grupo o individualmente.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+                    <label className="text-xs text-amber-400 font-semibold flex items-center gap-1.5 shrink-0">
+                      <Calendar className="w-4 h-4" /> Seleccionar Partido:
+                    </label>
+                    <select
+                      value={selectedMatchId}
+                      onChange={(e) => setSelectedMatchId(e.target.value)}
+                      className="w-full sm:w-auto bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-100 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                    >
+                      {matchList.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.location} — {new Date(m.date).toLocaleDateString('es-CO', { timeZone: 'America/Bogota', weekday: 'short', month: 'short', day: 'numeric' })} ({m.status === 'SETTLED' ? 'Liquidado' : 'Abierto'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {currentMatch && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <Badge variant="outline" className="border-zinc-700 text-zinc-300 gap-1 py-1">
+                        💵 Cuota Base: <strong className="text-emerald-400 font-mono">${basePitchFee.toLocaleString('es-CO')} COP</strong>
+                      </Badge>
+                      <Badge variant="outline" className="border-zinc-700 text-zinc-300 gap-1 py-1">
+                        👥 Asistentes: <strong className="text-white font-mono">{attendedCount || confirmedCount} jug.</strong>
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Section 1: 1-Click WhatsApp Group Broadcast for All Debtors */}
+          <Card className="border-emerald-800/40 bg-gradient-to-b from-emerald-950/30 to-zinc-900/60 shadow-xl">
+            <CardHeader className="pb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-sm sm:text-base flex items-center gap-2 text-emerald-400 font-bold">
+                  <Share2 className="w-4 h-4" /> 📢 Difusión Masiva al Grupo de WhatsApp (1 Solo Clic)
+                </CardTitle>
+                <Badge variant="success" className="text-[10px]">
+                  Cobro Grupal Instantáneo
+                </Badge>
+              </div>
+              <CardDescription className="text-xs text-zinc-300">
+                Envía en 1 solo clic la <strong>lista consolidada de deudores y confirmados</strong> al grupo del equipo para notificar a todos los que faltan por pagar de una sola vez, con el enlace al portal de pagos.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 text-xs sm:text-sm font-mono text-zinc-200 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto shadow-inner">
+                {groupSettlementDebtorsText || (
+                  <p className="text-zinc-500">Selecciona un partido para generar el reporte de cobro.</p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <Button
+                  onClick={() => {
+                    if (groupSettlementDebtorsText) {
+                      openWhatsAppWithMessage('', groupSettlementDebtorsText);
+                    }
+                  }}
+                  disabled={!currentMatch || !groupSettlementDebtorsText}
+                  size="lg"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-2 text-xs sm:text-sm shadow-lg shadow-emerald-900/30"
+                >
+                  <Share2 className="w-4 h-4" />
+                  📲 Enviar Lista de Pendientes al Grupo de WhatsApp (1 Clic)
+                </Button>
+
+                <Button
+                  onClick={() => copyToClipboard(groupSettlementDebtorsText, '¡Lista de cobro grupal copiada!')}
+                  variant="outline"
+                  size="lg"
+                  disabled={!groupSettlementDebtorsText}
+                  className="border-zinc-700 text-zinc-200 font-medium gap-2 text-xs sm:text-sm"
+                >
+                  <Copy className="w-4 h-4" /> Copiar Formato Grupal
+                </Button>
+
+                <Link href="/pago" target="_blank">
+                  <Button
+                    variant="ghost"
+                    size="lg"
+                    className="text-emerald-400 hover:text-emerald-300 text-xs sm:text-sm gap-1.5"
+                  >
+                    <ExternalLink className="w-4 h-4" /> Ver Portal de Pagos (/pago)
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Section 2: Fast 1-Click Debtor Action List */}
+          {(() => {
+            const matchAttendeesWithPayment = playingAttendances.map((att) => {
+              const p = getPlayer(att.playerId);
+              const info = getPlayerMatchBreakdown(att.playerId);
+              return {
+                att,
+                player: p,
+                info,
+              };
+            });
+
+            const unpaidAttendees = matchAttendeesWithPayment.filter((item) => !item.info.isPaid && item.player);
+            const paidAttendees = matchAttendeesWithPayment.filter((item) => item.info.isPaid && item.player);
+
+            return (
+              <Card className="border-zinc-800 bg-zinc-900/60">
+                <CardHeader className="pb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <CardTitle className="text-base flex items-center gap-2 text-white">
+                      <Flame className="w-4 h-4 text-amber-400" />
+                      ⚡ Cobro Rápido a Deudores del Partido ({unpaidAttendees.length} pendientes)
+                    </CardTitle>
+                    <div className="text-xs text-zinc-400">
+                      {paidAttendees.length} de {matchAttendeesWithPayment.length} jugadores al día
+                    </div>
+                  </div>
+                  <CardDescription className="text-xs text-zinc-400">
+                    Despacha el mensaje individual con el monto exacto y el link de pago de cada jugador con un solo clic.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {unpaidAttendees.length === 0 ? (
+                    <div className="p-4 bg-emerald-950/30 border border-emerald-800/40 rounded-xl flex items-center gap-3 text-emerald-200">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold">¡Todos los jugadores de este partido tienen su pago al día!</p>
+                        <p className="text-xs opacity-90">No hay deudas pendientes registradas para la nómina de este partido.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {unpaidAttendees.map(({ att, player, info }) => {
+                        if (!player) return null;
+                        const feeToPay = info.totalTargetFee > 0 ? info.totalTargetFee : basePitchFee;
+                        const debt = info.pendingAmount > 0 ? info.pendingAmount : feeToPay;
+                        const wasSent = sentPlayerIds.includes(player.id);
+                        const playerPaymentLink = `${baseDomain.replace(/\/+$/, '')}/pago?player=${player.id}`;
+
+                        return (
+                          <div
+                            key={att.id}
+                            className={`p-3 rounded-xl border transition-all ${
+                              wasSent
+                                ? 'bg-emerald-950/20 border-emerald-800/40'
+                                : 'bg-zinc-950/80 border-zinc-800 hover:border-zinc-700'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div>
+                                <h4 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                                  {player.fullName}
+                                  {player.alias && <span className="text-xs text-zinc-400 font-normal">({player.alias})</span>}
+                                </h4>
+                                <p className="text-[11px] font-mono text-zinc-400">{player.phone || 'Sin teléfono'}</p>
+                              </div>
+
+                              <Badge
+                                variant={info.isPartial ? 'warning' : 'destructive'}
+                                className="font-mono text-xs shrink-0"
+                              >
+                                {info.isPartial ? `Debe $${debt.toLocaleString('es-CO')}` : `Debe $${debt.toLocaleString('es-CO')}`}
+                              </Badge>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400 mb-3 font-mono">
+                              <span>Cancha: ${info.pitchFee.toLocaleString('es-CO')}</span>
+                              {info.hasVehicle && (
+                                <span className="text-cyan-400 flex items-center gap-0.5">
+                                  <Car className="w-3 h-3" /> +Parq (${info.parkingFee.toLocaleString('es-CO')})
+                                </span>
+                              )}
+                              {info.guestPlayers.length > 0 && (
+                                <span className="text-purple-400 flex items-center gap-0.5">
+                                  <Users className="w-3 h-3" /> +{info.guestPlayers.length} Invitado (${info.guestsFee.toLocaleString('es-CO')})
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-1 border-t border-zinc-800/80">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  const text = generatePlayerSettlementMessage(player);
+                                  openWhatsAppWithMessage(player.phone || '', text);
+                                  if (!sentPlayerIds.includes(player.id)) {
+                                    setSentPlayerIds((prev) => [...prev, player.id]);
+                                  }
+                                }}
+                                className={`flex-1 text-xs font-semibold gap-1.5 h-8 ${
+                                  wasSent
+                                    ? 'bg-emerald-700 hover:bg-emerald-600 text-white'
+                                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                }`}
+                              >
+                                {wasSent ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5" /> Reenviar WhatsApp
+                                  </>
+                                ) : (
+                                  <>
+                                    <Send className="w-3.5 h-3.5" /> 📲 Enviar WhatsApp
+                                  </>
+                                )}
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => copyToClipboard(playerPaymentLink, `¡Link de pago para ${player.fullName} copiado!`)}
+                                className="border-zinc-700 text-zinc-300 hover:text-white text-xs h-8 px-2.5 gap-1"
+                                title="Copiar link directo de pago"
+                              >
+                                <LinkIcon className="w-3.5 h-3.5 text-blue-400" />
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  const text = generatePlayerSettlementMessage(player);
+                                  copyToClipboard(text, `¡Mensaje para ${player.fullName} copiado!`);
+                                }}
+                                className="border-zinc-700 text-zinc-300 hover:text-white text-xs h-8 px-2.5"
+                                title="Copiar texto del mensaje"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
+
+          {/* Section 3: Target Player Selector & 1-to-1 Settlement Cards */}
           <Card className="border-zinc-800 bg-zinc-900/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Users className="w-4 h-4 text-amber-400" /> Cobro de Cartera a Deudores (1-a-1)
+                <Users className="w-4 h-4 text-amber-400" /> Cobro Individual Personalizado (1-a-1)
               </CardTitle>
               <CardDescription className="text-xs">
-                Selecciona al jugador para recordarle cobros pendientes o enviar su alerta individual.
+                Selecciona a cualquier jugador del club para consultar su cuota, saldo y generar su mensaje directo.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -812,11 +1268,15 @@ export function NotificationsView({
                     onChange={(e) => handlePlayerSelect(e.target.value)}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
                   >
-                    {players.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.fullName} ({p.alias || 'Jugador'})
-                      </option>
-                    ))}
+                    {players.map((p) => {
+                      const breakdown = getPlayerMatchBreakdown(p.id);
+                      const isUnpaid = !breakdown.isPaid;
+                      return (
+                        <option key={p.id} value={p.id}>
+                          {p.fullName} ({p.alias || 'Jugador'}) {isUnpaid ? '— 🔴 Debe Cuota' : '— ✅ Al día'}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
                 <div>
@@ -830,6 +1290,27 @@ export function NotificationsView({
                   />
                 </div>
               </div>
+
+              {/* Direct Payment Link Banner for Selected Player */}
+              {selectedPlayer && (
+                <div className="mt-3 p-3 bg-zinc-950 rounded-lg border border-zinc-800 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 truncate">
+                    <LinkIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="text-xs text-zinc-400 shrink-0">Link Personal de Pago:</span>
+                    <span className="text-xs font-mono text-emerald-300 truncate" suppressHydrationWarning>
+                      {mounted ? `${baseDomain}/pago?player=${selectedPlayer.id}` : `/pago?player=${selectedPlayer.id}`}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => copyToClipboard(`${baseDomain}/pago?player=${selectedPlayer.id}`, '¡Link de pago copiado!')}
+                    className="h-7 text-xs border-zinc-700 shrink-0 gap-1"
+                  >
+                    <Copy className="w-3 h-3" /> Copiar Link
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -839,14 +1320,14 @@ export function NotificationsView({
             <Card className="border-zinc-800 bg-zinc-900/60 flex flex-col justify-between">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 text-amber-400">
-                  <DollarSign className="w-4 h-4" /> 1. Cobro de Cuota Liquidada
+                  <DollarSign className="w-4 h-4" /> 1. Cobro de Cuota del Partido (Personalizado)
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Notifica la cuota congelada tras la liquidación del partido.
+                  Notifica la cuota exacta (cancha, parqueadero, invitados) y el link del portal de pagos.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="bg-zinc-950 p-3 rounded border border-zinc-800 text-xs font-mono text-zinc-300 whitespace-pre-wrap leading-relaxed h-44 overflow-y-auto">
+                <div className="bg-zinc-950 p-3 rounded border border-zinc-800 text-xs font-mono text-zinc-300 whitespace-pre-wrap leading-relaxed h-48 overflow-y-auto">
                   {feeSettledText}
                 </div>
                 <div className="flex gap-2">
@@ -854,15 +1335,15 @@ export function NotificationsView({
                     onClick={() => openDirectWhatsAppUrl(feeSettledText)}
                     variant="default"
                     size="sm"
-                    className="w-full gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+                    className="w-full gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
                   >
                     <ExternalLink className="w-3.5 h-3.5" /> Enviar por WhatsApp
                   </Button>
                   <Button
-                    onClick={() => copyToClipboard(feeSettledText)}
+                    onClick={() => copyToClipboard(feeSettledText, '¡Mensaje de cuota copiado!')}
                     variant="outline"
                     size="sm"
-                    className="border-zinc-700 px-2"
+                    className="border-zinc-700 px-2.5"
                   >
                     <Copy className="w-3.5 h-3.5" />
                   </Button>
@@ -874,14 +1355,14 @@ export function NotificationsView({
             <Card className="border-zinc-800 bg-zinc-900/60 flex flex-col justify-between">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 text-rose-400">
-                  <AlertTriangle className="w-4 h-4" /> 2. Recordatorio de Cartera en Mora
+                  <AlertTriangle className="w-4 h-4" /> 2. Recordatorio de Cartera en Mora (General)
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Mensaje respetuoso para jugadores con saldo pendiente.
+                  Mensaje con saldo acumulado de cartera y link al portal de pagos.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="bg-zinc-950 p-3 rounded border border-zinc-800 text-xs font-mono text-zinc-300 whitespace-pre-wrap leading-relaxed h-44 overflow-y-auto">
+                <div className="bg-zinc-950 p-3 rounded border border-zinc-800 text-xs font-mono text-zinc-300 whitespace-pre-wrap leading-relaxed h-48 overflow-y-auto">
                   {debtReminderText}
                 </div>
                 <div className="flex gap-2">
@@ -889,15 +1370,15 @@ export function NotificationsView({
                     onClick={() => openDirectWhatsAppUrl(debtReminderText)}
                     variant="default"
                     size="sm"
-                    className="w-full gap-1.5 bg-rose-600 hover:bg-rose-500 text-white"
+                    className="w-full gap-1.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold"
                   >
                     <ExternalLink className="w-3.5 h-3.5" /> Enviar por WhatsApp
                   </Button>
                   <Button
-                    onClick={() => copyToClipboard(debtReminderText)}
+                    onClick={() => copyToClipboard(debtReminderText, '¡Recordatorio de cartera copiado!')}
                     variant="outline"
                     size="sm"
-                    className="border-zinc-700 px-2"
+                    className="border-zinc-700 px-2.5"
                   >
                     <Copy className="w-3.5 h-3.5" />
                   </Button>

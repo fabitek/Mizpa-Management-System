@@ -54,7 +54,9 @@ export class SendSettlementAlertsUseCase {
         `📍 *Cancha:* ${match.location}\n` +
         `💵 *Cuota Congelada:* $${match.settledFeePerPlayer.toLocaleString('es-CO')} COP\n` +
         `📊 *Tu Saldo en Billetera:* $${balance.toLocaleString('es-CO')} COP (${isSolvent ? 'Al día ✅' : 'Saldo pendiente ⚠️'})\n\n` +
-        `💳 Realiza tus abonos mediante transferencia y sube tu comprobante en la billetera.`;
+        `💳 *Paga o reporta tu comprobante aquí:*\n` +
+        `👉 https://mizpa-fc.vercel.app/pago?player=${payerId}\n\n` +
+        `🟣 *Nequi / 🔴 Daviplata:* 312 357 8415 (Cesar Tellez)`;
 
       const notif = await this.notificationService.sendNotification({
         recipientPlayerId: payerId,
