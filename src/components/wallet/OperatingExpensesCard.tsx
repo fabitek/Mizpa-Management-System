@@ -79,11 +79,11 @@ export function OperatingExpensesCard({
     e.preventDefault();
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      setFeedback({ success: false, message: 'Por favor ingresa un monto válido mayor a cero.' });
+      setFeedback({ success: false, message: 'Ingresa un valor mayor a cero.' });
       return;
     }
     if (!description.trim()) {
-      setFeedback({ success: false, message: 'Por favor ingresa el concepto o detalle del gasto.' });
+      setFeedback({ success: false, message: 'Ingresa el detalle o concepto del egreso.' });
       return;
     }
 
@@ -117,7 +117,7 @@ export function OperatingExpensesCard({
   };
 
   const handleDeleteExpense = (id: string, expAmount: number, expCat: ExpenseCategory) => {
-    if (!confirm('¿Estás seguro de eliminar este registro de gasto operativo?')) return;
+    if (!confirm('¿Deseas eliminar este registro de gasto?')) return;
 
     startTransition(async () => {
       const res = await deleteOperatingExpenseAction(id);
@@ -160,7 +160,7 @@ export function OperatingExpensesCard({
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-zinc-400">
-            Total abonos recaudados menos gastos operativos ejecutados.
+            Abonos recaudados menos egresos del equipo.
           </CardContent>
         </Card>
 
@@ -174,7 +174,7 @@ export function OperatingExpensesCard({
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-zinc-400">
-            {expenses.length} egresos registrados (balones, petos, hidratación, arbitraje).
+            {expenses.length} egresos registrados en caja menor.
           </CardContent>
         </Card>
 
@@ -234,7 +234,7 @@ export function OperatingExpensesCard({
                 <PlusCircle className="w-4 h-4 text-emerald-400" /> Registrar Egreso / Gasto
               </CardTitle>
               <CardDescription className="text-xs">
-                Registra compras de materiales, arbitraje o logística con comprobante.
+                Registra compras de balones, petos, arbitraje o logística.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -327,7 +327,7 @@ export function OperatingExpensesCard({
                   disabled={isPending || !amount || !description}
                   className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl shadow-lg transition-all"
                 >
-                  {isPending ? 'Guardando...' : 'Registrar Egreso en Caja Menor'}
+                  {isPending ? 'Guardando...' : 'Guardar Egreso'}
                 </Button>
               </form>
             </CardContent>
@@ -402,7 +402,7 @@ export function OperatingExpensesCard({
             <CardContent>
               {filteredExpenses.length === 0 ? (
                 <div className="py-12 text-center text-zinc-500 text-sm">
-                  No se encontraron egresos operativos registrados para este criterio.
+                  No hay egresos registrados con este filtro.
                 </div>
               ) : (
                 <Table>

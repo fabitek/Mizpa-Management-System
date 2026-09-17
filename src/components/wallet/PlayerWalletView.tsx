@@ -90,7 +90,7 @@ export function PlayerWalletView({
     e.preventDefault();
     const amountNum = parseFloat(creditAmount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      setFeedback({ success: false, message: 'Ingresa un monto válido mayor a cero.' });
+      setFeedback({ success: false, message: 'Ingresa un valor mayor a cero.' });
       return;
     }
 
@@ -163,7 +163,7 @@ export function PlayerWalletView({
             </h1>
           </div>
           <p className="text-zinc-400 mt-1 text-sm">
-            Control de abonos con OCR, comprobantes bancarios, caja menor de gastos y estados de cuenta.
+            Control de abonos, comprobantes bancarios, caja menor y estados de cuenta.
           </p>
         </div>
 
@@ -222,7 +222,7 @@ export function PlayerWalletView({
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-zinc-400">
-                Total abonos menos liquidaciones de cancha.
+                Abonos menos liquidaciones de cancha.
               </CardContent>
             </Card>
 
@@ -236,7 +236,7 @@ export function PlayerWalletView({
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-zinc-400">
-                Suma de saldos pendientes de jugadores en mora.
+                Total de cuotas pendientes por cobrar.
               </CardContent>
             </Card>
 
@@ -250,7 +250,7 @@ export function PlayerWalletView({
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-zinc-400">
-                Ingresos históricos por transferencias Nequi/Bancolombia.
+                Abonos registrados por transferencias.
               </CardContent>
             </Card>
 
@@ -264,7 +264,7 @@ export function PlayerWalletView({
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-zinc-400">
-                Cuotas cobradas por partidos e invitados jugados.
+                Total liquidado en partidos e invitados.
               </CardContent>
             </Card>
           </div>
@@ -355,7 +355,7 @@ export function PlayerWalletView({
                     <PlusCircle className="w-4 h-4 text-emerald-400" /> Registrar Abono / Recarga
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Asigna saldo a favor a {selectedPlayer.fullName} respaldado por transferencia.
+                    Registra un abono a favor de {selectedPlayer.fullName}.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -423,7 +423,7 @@ export function PlayerWalletView({
                       disabled={isPending || !creditAmount}
                       className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg transition-all"
                     >
-                      {isPending ? 'Registrando en Libro Contable...' : 'Registrar Abono en Libro Contable 💳'}
+                      {isPending ? 'Guardando abono...' : 'Guardar Abono 💳'}
                     </Button>
                   </form>
                 </CardContent>
@@ -443,13 +443,13 @@ export function PlayerWalletView({
                     </span>
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Asientos inmutables de débito (partidos e invitados) y crédito (abonos) para {selectedPlayer.fullName}.
+                    Historial de abonos y cuotas de partidos para {selectedPlayer.fullName}.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {statement.entries.length === 0 ? (
                     <div className="py-12 text-center text-zinc-500 text-sm">
-                      No hay movimientos contables registrados para este jugador.
+                      No hay movimientos registrados para este jugador.
                     </div>
                   ) : (
                     <Table>
@@ -560,7 +560,7 @@ export function PlayerWalletView({
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-zinc-400">
-                Abonos Recaudados (${overview.totalCreditsCollected.toLocaleString('es-CO')}) menos Gastos Operativos (${initialExpensesSummary.totalAmount.toLocaleString('es-CO')}).
+                Abonos recaudados menos gastos operativos del equipo.
               </CardContent>
             </Card>
 
@@ -574,7 +574,7 @@ export function PlayerWalletView({
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-zinc-400">
-                {overview.playerBalances.filter((p) => p.status === 'DEBTOR').length} jugadores con saldo negativo por cuotas.
+                {overview.playerBalances.filter((p) => p.status === 'DEBTOR').length} jugadores con cuotas pendientes.
               </CardContent>
             </Card>
 
@@ -590,7 +590,7 @@ export function PlayerWalletView({
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-zinc-400">
-                Ratio entre abonos históricos y total liquidado en cancha.
+                Porcentaje recaudado sobre el total liquidado.
               </CardContent>
             </Card>
           </div>
@@ -607,7 +607,7 @@ export function PlayerWalletView({
                 </span>
               </CardTitle>
               <CardDescription className="text-xs">
-                Resumen consolidado de solvencia de toda la nómina de Mizpa FC.
+                Resumen de balance y solvencia de toda la plantilla.
               </CardDescription>
             </CardHeader>
             <CardContent>

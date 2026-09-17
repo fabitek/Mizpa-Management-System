@@ -219,7 +219,7 @@ export function PublicRsvpView({
     const cleanEmail = gmailAddress.trim().toLowerCase();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!cleanEmail || !emailRegex.test(cleanEmail)) {
-      setFeedback({ success: false, message: 'Por favor ingresa un correo de Google válido (ej: tu.nombre@gmail.com).' });
+      setFeedback({ success: false, message: 'Ingresa un correo de Google válido (ej: tu.nombre@gmail.com).' });
       return;
     }
 
@@ -241,7 +241,7 @@ export function PublicRsvpView({
             : 'en LISTA DE ESPERA';
         setFeedback({
           success: false,
-          message: `⚠️ ¡Hola, ${matchedPlayer.fullName}! Ya te encuentras registrado en este partido como ${statusText}. No es necesario inscribirte de nuevo.`,
+          message: `⚠️ ¡Hola, ${matchedPlayer.fullName}! Ya estás registrado como ${statusText}.`,
         });
         setRecognizedPlayer(matchedPlayer);
         setSelectedPlayerId(matchedPlayer.id);
@@ -262,7 +262,7 @@ export function PublicRsvpView({
       setNewPlayerPhone(matchedPlayer.phone || '');
       setFeedback({
         success: true,
-        message: `⚡ ¡Hola, ${matchedPlayer.fullName}! Reconocimos tu cuenta de Google (${matchedPlayer.email}). Tus datos fueron vinculados automáticamente.`,
+        message: `⚡ ¡Hola, ${matchedPlayer.fullName}! Reconocimos tu cuenta (${matchedPlayer.email}). Datos vinculados.`,
       });
       // Skip directly to Step 4 (Logistics / Vehicle & Guest)
       setStep(4);
@@ -287,7 +287,7 @@ export function PublicRsvpView({
   const handleStep2Submit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!newPlayerName.trim()) {
-      setFeedback({ success: false, message: 'Por favor ingresa tu Nombre y Apellido completo.' });
+      setFeedback({ success: false, message: 'Ingresa tu nombre y apellido completo.' });
       return;
     }
     setFeedback(null);
@@ -311,7 +311,7 @@ export function PublicRsvpView({
         if (matched.email && !gmailAddress) setGmailAddress(matched.email);
         setFeedback({
           success: true,
-          message: `⚡ Cédula identificada: ¡Hola, ${matched.fullName}! Tus datos fueron vinculados automáticamente.`,
+          message: `⚡ ¡Hola, ${matched.fullName}! Cédula identificada y datos vinculados.`,
         });
       }
     }
@@ -322,11 +322,11 @@ export function PublicRsvpView({
     if (e) e.preventDefault();
     const cleanDoc = newPlayerDocumentId.trim();
     if (!cleanDoc) {
-      setFeedback({ success: false, message: 'Por favor ingresa tu Cédula / Documento de Identidad.' });
+      setFeedback({ success: false, message: 'Ingresa tu documento de identidad.' });
       return;
     }
     if (!newPlayerPhone.trim()) {
-      setFeedback({ success: false, message: 'Por favor ingresa tu número de WhatsApp.' });
+      setFeedback({ success: false, message: 'Ingresa tu número de WhatsApp.' });
       return;
     }
 
@@ -341,7 +341,7 @@ export function PublicRsvpView({
             : 'en LISTA DE ESPERA';
         setFeedback({
           success: false,
-          message: `⚠️ ¡Hola, ${matched.fullName}! Esta cédula ya se encuentra registrada en este partido como ${statusText}.`,
+          message: `⚠️ ¡Hola, ${matched.fullName}! Esta cédula ya está registrada como ${statusText}.`,
         });
         setShowRosterModal(true);
         return;
@@ -361,12 +361,12 @@ export function PublicRsvpView({
   const handleStep4Submit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (hasVehicle && !vehiclePlate.trim()) {
-      setFeedback({ success: false, message: 'Por favor ingresa la placa de tu vehículo.' });
+      setFeedback({ success: false, message: 'Ingresa la placa de tu vehículo.' });
       return;
     }
     if (hasGuest) {
       if (!guestName.trim()) {
-        setFeedback({ success: false, message: 'Por favor ingresa el nombre de tu invitado (+1).' });
+        setFeedback({ success: false, message: 'Ingresa el nombre de tu invitado.' });
         return;
       }
       const norm = (s: string) =>
@@ -388,7 +388,7 @@ export function PublicRsvpView({
       ) {
         setFeedback({
           success: false,
-          message: '⚠️ El nombre de tu invitado no puede ser tu propio nombre. Si asistes solo, desmarca la opción de invitado (+1).',
+          message: 'El nombre de tu invitado no puede ser el tuyo. Si vas solo, desmarca la opción de invitado.',
         });
         return;
       }
@@ -420,7 +420,7 @@ export function PublicRsvpView({
       displayName = newPlayerName.trim();
     } else {
       if (!playerIdToUse) {
-        setFeedback({ success: false, message: 'Por favor selecciona tu nombre de la lista.' });
+        setFeedback({ success: false, message: 'Selecciona tu nombre de la lista.' });
         return;
       }
       const p = getPlayer(playerIdToUse);
@@ -465,7 +465,7 @@ export function PublicRsvpView({
           if (resPlayer.errorCode === 'ALREADY_REGISTERED') {
             setFeedback({
               success: false,
-              message: '⚠️ Este jugador ya se encuentra formalmente inscrito y confirmado en la nómina oficial. Puedes revisar su posición abajo.',
+              message: '⚠️ Este jugador ya está en la nómina del partido.',
             });
             setShowRosterModal(true);
           } else {
@@ -586,11 +586,11 @@ export function PublicRsvpView({
     e.preventDefault();
     const pid = completedPlayerId || selectedPlayerId;
     if (!pid) {
-      setPaymentFeedback({ success: false, message: 'No se encontró el identificador del jugador.' });
+      setPaymentFeedback({ success: false, message: 'No se encontró el jugador seleccionado.' });
       return;
     }
     if (paymentAmount <= 0) {
-      setPaymentFeedback({ success: false, message: 'El monto a transferir debe ser mayor a $0.' });
+      setPaymentFeedback({ success: false, message: 'El valor a transferir debe ser mayor a $0.' });
       return;
     }
 
@@ -609,7 +609,7 @@ export function PublicRsvpView({
           setPaymentFeedback(res);
         }
       } catch (err) {
-        setPaymentFeedback({ success: false, message: 'Error al registrar el comprobante en tesorería.' });
+        setPaymentFeedback({ success: false, message: 'Error al registrar el comprobante de pago.' });
       }
     });
   };
@@ -633,7 +633,7 @@ export function PublicRsvpView({
               ¡Inscripción Exitosa!
             </h1>
             <p className="text-sm text-emerald-300/90 max-w-md mx-auto mt-1">
-              Tu registro ha sido procesado de forma oficial en la nómina de Mizpa FC.
+              Tu cupo quedó registrado en la nómina del partido.
             </p>
           </div>
 

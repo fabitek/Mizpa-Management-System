@@ -36,13 +36,13 @@ export async function sendMatchConvocationAction(
 
     return {
       success: true,
-      message: 'Convocatoria oficial para grupo generada y registrada exitosamente.',
+      message: 'Convocatoria de grupo lista.',
       data: notif,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al enviar convocatoria.',
+      message: error instanceof Error ? error.message : 'Fallo al enviar convocatoria.',
     };
   }
 }
@@ -68,7 +68,7 @@ export async function getMatchConvocationDataAction(
 
     return {
       success: true,
-      message: 'Datos de convocatoria generados correctamente.',
+      message: 'Datos de convocatoria listos.',
       data: {
         messageText: notif.content,
         rsvpUrl: notif.actionUrl || `/rsvp/${matchId}`,
@@ -78,7 +78,7 @@ export async function getMatchConvocationDataAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al generar convocatoria.',
+      message: error instanceof Error ? error.message : 'No se pudo generar la convocatoria.',
     };
   }
 }
@@ -94,13 +94,13 @@ export async function sendSettlementAlertsAction(
 
     return {
       success: true,
-      message: `Se emitieron ${notifications.length} alertas de cuota liquidada por WhatsApp.`,
+      message: `${notifications.length} avisos de cobro preparados para WhatsApp.`,
       data: notifications,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al enviar alertas de liquidación.',
+      message: error instanceof Error ? error.message : 'Fallo al generar avisos de liquidación.',
     };
   }
 }
@@ -117,20 +117,20 @@ export async function sendDebtReminderAction(
     if (!reminder) {
       return {
         success: true,
-        message: 'El jugador se encuentra al día (solvente); no requiere recordatorio de cobro.',
+        message: 'Jugador al día. Sin cobros pendientes.',
         data: null,
       };
     }
 
     return {
       success: true,
-      message: 'Recordatorio de pago generado exitosamente.',
+      message: 'Recordatorio de pago listo.',
       data: reminder,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al enviar recordatorio de cartera.',
+      message: error instanceof Error ? error.message : 'Fallo al generar recordatorio.',
     };
   }
 }
@@ -142,13 +142,13 @@ export async function getNotificationsLogAction(): Promise<
     const logs = await getNotificationsLogUseCase.execute();
     return {
       success: true,
-      message: 'Historial de notificaciones obtenido exitosamente.',
+      message: 'Historial de notificaciones cargado.',
       data: logs,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al obtener historial.',
+      message: error instanceof Error ? error.message : 'Error al cargar historial.',
     };
   }
 }
@@ -179,10 +179,10 @@ export async function checkAndNotifyCapacityReachedAction(
     }
 
     const message = result.triggered
-      ? '¡Quórum de 10 jugadores alcanzado! Notificaciones de WhatsApp y Portería despachadas.'
+      ? 'Quórum de 10 alcanzado. Mensajes de grupo y portería listos.'
       : result.reason === 'ALREADY_SENT'
-      ? 'La notificación de quórum (10 jugadores) ya había sido enviada previamente.'
-      : `El partido cuenta con ${result.confirmedCount} confirmados (se requieren 10 para disparar).`;
+      ? 'Notificación de quórum ya emitida anteriormente.'
+      : `${result.confirmedCount} confirmados (faltan ${Math.max(0, 10 - result.confirmedCount)} para quórum).`;
 
     return {
       success: true,
@@ -195,7 +195,7 @@ export async function checkAndNotifyCapacityReachedAction(
       message:
         error instanceof Error
           ? error.message
-          : 'Error al verificar quórum de 10 jugadores.',
+          : 'Error al validar quórum.',
     };
   }
 }

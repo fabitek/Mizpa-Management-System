@@ -39,7 +39,7 @@ export async function recordPlayerCreditAction(
 
     return {
       success: true,
-      message: `Abono de $${amount.toLocaleString('es-CO')} registrado con éxito. Nuevo saldo: $${result.newBalance.toLocaleString('es-CO')}.`,
+      message: `Abono por $${amount.toLocaleString('es-CO')} guardado. Saldo actual: $${result.newBalance.toLocaleString('es-CO')}.`,
       data: {
         entry: {
           ...result.entry,
@@ -53,14 +53,14 @@ export async function recordPlayerCreditAction(
     if (error instanceof InvalidFinancialAmountError) {
       return {
         success: false,
-        message: 'El monto del abono debe ser mayor a cero.',
+        message: 'El valor debe ser superior a cero.',
         errorCode: 'INVALID_AMOUNT',
       };
     }
 
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al registrar el abono.',
+      message: error instanceof Error ? error.message : 'No se pudo registrar el abono.',
       errorCode: 'UNKNOWN_ERROR',
     };
   }
@@ -74,7 +74,7 @@ export async function getPlayerStatementAction(
 
     return {
       success: true,
-      message: 'Estado de cuenta obtenido con éxito.',
+      message: 'Estado de cuenta actualizado.',
       data: {
         ...statement,
         entries: statement.entries.map((e) => ({
@@ -87,7 +87,7 @@ export async function getPlayerStatementAction(
   } catch (error: unknown) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al consultar estado de cuenta.',
+      message: error instanceof Error ? error.message : 'Error al cargar estado de cuenta.',
       errorCode: 'UNKNOWN_ERROR',
     };
   }
@@ -101,7 +101,7 @@ export async function getMatchSummaryAction(
 
     return {
       success: true,
-      message: 'Resumen financiero obtenido con éxito.',
+      message: 'Balance del partido listo.',
       data: {
         ...summary,
         date: summary.date.toISOString(),
@@ -116,14 +116,14 @@ export async function getMatchSummaryAction(
     if (error instanceof MatchNotFoundError) {
       return {
         success: false,
-        message: 'Partido no encontrado.',
+        message: 'Partido inexistente.',
         errorCode: 'MATCH_NOT_FOUND',
       };
     }
 
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al consultar resumen financiero.',
+      message: error instanceof Error ? error.message : 'No se pudo obtener el resumen financiero.',
       errorCode: 'UNKNOWN_ERROR',
     };
   }
@@ -137,13 +137,13 @@ export async function getTreasuryOverviewAction(
 
     return {
       success: true,
-      message: 'Resumen global de tesorería obtenido con éxito.',
+      message: 'Balance de tesorería cargado.',
       data: overview,
     };
   } catch (error: unknown) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al consultar tesorería.',
+      message: error instanceof Error ? error.message : 'Error al cargar tesorería.',
       errorCode: 'UNKNOWN_ERROR',
     };
   }
@@ -154,7 +154,7 @@ export async function getAllFinancialEntriesAction(): Promise<FinancialActionRes
     const entries = await container.financeRepository.getAllEntries();
     return {
       success: true,
-      message: 'Entradas financieras obtenidas.',
+      message: 'Movimientos financieros cargados.',
       data: entries.map((e) => ({
         ...e,
         referenceDate: e.referenceDate.toISOString(),
@@ -164,7 +164,7 @@ export async function getAllFinancialEntriesAction(): Promise<FinancialActionRes
   } catch (error: unknown) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al obtener entradas financieras.',
+      message: error instanceof Error ? error.message : 'Error al consultar libro contable.',
       errorCode: 'FINANCE_ERROR',
     };
   }
@@ -194,7 +194,7 @@ export async function recordOperatingExpenseAction(input: {
 
     return {
       success: true,
-      message: `Egreso de $${input.amount.toLocaleString('es-CO')} COP registrado en '${input.description}'.`,
+      message: `Egreso guardado: $${input.amount.toLocaleString('es-CO')} COP en ${input.description}.`,
       data: {
         ...expense,
         expenseDate: expense.expenseDate.toISOString(),
@@ -204,7 +204,7 @@ export async function recordOperatingExpenseAction(input: {
   } catch (error: unknown) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al registrar egreso operativo.',
+      message: error instanceof Error ? error.message : 'No se pudo guardar el gasto.',
       errorCode: 'OPERATING_EXPENSE_ERROR',
     };
   }
@@ -216,7 +216,7 @@ export async function getOperatingExpensesAction(): Promise<FinancialActionResul
 
     return {
       success: true,
-      message: 'Gastos operativos obtenidos con éxito.',
+      message: 'Libro de egresos cargado.',
       data: {
         ...summary,
         expenses: summary.expenses.map((e) => ({
@@ -229,7 +229,7 @@ export async function getOperatingExpensesAction(): Promise<FinancialActionResul
   } catch (error: unknown) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al consultar gastos operativos.',
+      message: error instanceof Error ? error.message : 'Error al consultar egresos.',
       errorCode: 'OPERATING_EXPENSE_ERROR',
     };
   }
@@ -244,12 +244,12 @@ export async function deleteOperatingExpenseAction(
 
     return {
       success: true,
-      message: 'Gasto operativo eliminado correctamente.',
+      message: 'Gasto eliminado del libro contable.',
     };
   } catch (error: unknown) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al eliminar gasto operativo.',
+      message: error instanceof Error ? error.message : 'No se pudo eliminar el gasto.',
       errorCode: 'DELETE_EXPENSE_ERROR',
     };
   }
@@ -262,13 +262,13 @@ export async function parseReceiptOcrAction(
     const result = container.processReceiptOcrUseCase.execute(rawText);
     return {
       success: true,
-      message: `Comprobante analizado con éxito (${result.detectedBank}).`,
+      message: `Comprobante leído: ${result.detectedBank}.`,
       data: result,
     };
   } catch (error: unknown) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al analizar el comprobante.',
+      message: error instanceof Error ? error.message : 'Fallo en lectura OCR del comprobante.',
       errorCode: 'OCR_ERROR',
     };
   }
@@ -284,12 +284,12 @@ export async function deleteFinancialEntryAction(
 
     return {
       success: true,
-      message: 'Registro financiero eliminado con éxito.',
+      message: 'Movimiento eliminado del balance.',
     };
   } catch (error: unknown) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al eliminar el registro financiero.',
+      message: error instanceof Error ? error.message : 'No se pudo anular el movimiento.',
       errorCode: 'DELETE_FINANCIAL_ENTRY_ERROR',
     };
   }

@@ -488,10 +488,10 @@ export function NotificationsView({
       {/* Header */}
       <div className="pb-4 border-b border-zinc-800">
         <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
-          🔔 Centro de Convocatorias & Notificaciones WhatsApp
+          🔔 Convocatorias y Avisos por WhatsApp
         </h1>
         <p className="text-zinc-400 mt-1 text-sm">
-          Crea la convocatoria oficial con un <strong>único enlace de registro</strong> para el grupo de WhatsApp del equipo. Cada jugador da clic y se inscribe directamente.
+          Publica la convocatoria con un <strong>enlace directo de registro</strong> al chat del equipo. Cada jugador entra y asegura su puesto al instante.
         </p>
       </div>
 

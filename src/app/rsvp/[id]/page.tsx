@@ -41,7 +41,7 @@ export default async function RsvpPage({ params }: RsvpPageProps) {
                 href="/matches"
                 className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg transition-colors text-sm"
               >
-                Ver Lista de Partidos Oficiales
+                Ver Partidos Disponibles
               </a>
             </div>
           </div>

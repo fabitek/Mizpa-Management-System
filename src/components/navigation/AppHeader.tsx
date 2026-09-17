@@ -149,7 +149,7 @@ export function AppHeader({
             size="sm"
             onClick={handleLogout}
             className="text-zinc-500 hover:text-red-400 hover:bg-red-950/30 p-2 h-9 w-9 rounded-[10px] transition-colors"
-            title="Cerrar sesión — para cambiar de perfil, inicia con tu cuenta de Google"
+            title="Cerrar sesión"
           >
             <LogOut className="w-4 h-4" />
           </Button>

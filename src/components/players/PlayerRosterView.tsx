@@ -135,7 +135,7 @@ export function PlayerRosterView({ initialPlayers, currentUserRole = 'ADMIN' }: 
     setFeedback(null);
 
     if (!formData.fullName.trim()) {
-      setFeedback({ type: 'error', message: 'El nombre completo es requerido.' });
+      setFeedback({ type: 'error', message: 'Ingresa el nombre completo del jugador.' });
       return;
     }
 
@@ -192,7 +192,7 @@ export function PlayerRosterView({ initialPlayers, currentUserRole = 'ADMIN' }: 
   const handleBulkImport = (e: React.FormEvent) => {
     e.preventDefault();
     if (!bulkInput.trim()) {
-      setFeedback({ type: 'error', message: 'Pega los datos de la nómina antes de procesar.' });
+      setFeedback({ type: 'error', message: 'Pega los datos de la plantilla antes de importar.' });
       return;
     }
 
@@ -246,7 +246,7 @@ export function PlayerRosterView({ initialPlayers, currentUserRole = 'ADMIN' }: 
             </h1>
           </div>
           <p className="text-zinc-400 text-sm">
-            Control de plantilla real, roles de capitán/admin y registro masivo para convocatorias.
+            Gestión de plantilla, roles y registro rápido para convocatorias.
           </p>
         </div>
 
@@ -315,7 +315,7 @@ export function PlayerRosterView({ initialPlayers, currentUserRole = 'ADMIN' }: 
         <Card className="bg-zinc-900/60 border-zinc-800/80">
           <CardContent className="p-4 sm:p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-emerald-400 uppercase tracking-wider">Activos / Habilitados</p>
+              <p className="text-xs font-medium text-emerald-400 uppercase tracking-wider">Activos</p>
               <p className="text-2xl font-black text-emerald-400 mt-1">{activePlayers}</p>
             </div>
             <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
@@ -360,7 +360,7 @@ export function PlayerRosterView({ initialPlayers, currentUserRole = 'ADMIN' }: 
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar por nombre, apodo, email o cel..."
+                placeholder="Buscar por nombre, apodo, celular o correo..."
                 className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl pl-9 pr-4 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
               />
               {searchTerm && (
@@ -460,9 +460,9 @@ export function PlayerRosterView({ initialPlayers, currentUserRole = 'ADMIN' }: 
                   <td colSpan={5} className="py-12 text-center text-zinc-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Users className="w-8 h-8 text-zinc-600" />
-                      <p className="text-base font-medium text-zinc-300">No se encontraron jugadores</p>
+                      <p className="text-base font-medium text-zinc-300">No hay jugadores con ese criterio</p>
                       <p className="text-xs text-zinc-500">
-                        {searchTerm ? 'Prueba con otro término de búsqueda.' : 'Carga la nómina o añade un nuevo jugador.'}
+                        {searchTerm ? 'Prueba con otro término de búsqueda.' : 'Añade un jugador o importa la nómina del equipo.'}
                       </p>
                     </div>
                   </td>
@@ -720,7 +720,7 @@ export function PlayerRosterView({ initialPlayers, currentUserRole = 'ADMIN' }: 
                       onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                       className="rounded border-zinc-700 bg-zinc-950 text-emerald-500 focus:ring-emerald-500"
                     />
-                    <span>Jugador Activo / Habilitado para convocatorias</span>
+                    <span>Jugador activo para convocatorias</span>
                   </label>
                 </div>
               )}
@@ -809,7 +809,7 @@ export function PlayerRosterView({ initialPlayers, currentUserRole = 'ADMIN' }: 
                   className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold gap-2"
                 >
                   <Sparkles className="w-4 h-4" />
-                  {isPending ? 'Procesando nómina...' : 'Importar Nómina'}
+                  {isPending ? 'Importando...' : 'Importar Nómina'}
                 </Button>
               </div>
             </form>

@@ -34,7 +34,7 @@ export function LoginForm() {
     setLoading(true);
     setMessage({
       success: true,
-      text: '✅ Conectando con cuenta Google (fabian.tellez@gmail.com)... ¡Sesión iniciada con éxito!',
+      text: 'Conectando con Google... Sesión lista.',
     });
     try {
       await switchUserAction('f0000000-0000-4000-8000-000000000001');
@@ -70,7 +70,7 @@ export function LoginForm() {
           // Fallback to local login if Supabase email is not configured
           setMessage({
             success: true,
-            text: `Accediendo con cuenta: ${email.trim()}...`,
+            text: `Accediendo con ${email.trim()}...`,
           });
           await switchUserAction('f0000000-0000-4000-8000-000000000001');
           setTimeout(() => {
@@ -79,7 +79,7 @@ export function LoginForm() {
         } else {
           setMessage({
             success: true,
-            text: `¡Enlace de acceso enviado! Revisa tu bandeja de entrada en ${email} para ingresar con un clic.`,
+            text: `Enlace enviado. Revisa tu correo ${email} para entrar directo.`,
           });
         }
       } else {
@@ -91,19 +91,19 @@ export function LoginForm() {
         if (error) {
           setMessage({
             success: true,
-            text: '¡Accediendo al sistema Mizpa...',
+            text: 'Entrando al sistema...',
           });
           await switchUserAction('f0000000-0000-4000-8000-000000000001');
           setTimeout(() => {
             router.push('/matches');
           }, 1000);
         } else {
-          setMessage({ success: true, text: '¡Sesión iniciada con éxito! Redirigiendo...' });
+          setMessage({ success: true, text: 'Sesión iniciada. Redirigiendo...' });
           router.push('/matches');
         }
       }
     } catch (err: any) {
-      setMessage({ success: true, text: 'Iniciando sesión...' });
+      setMessage({ success: true, text: 'Entrando...' });
       await switchUserAction('f0000000-0000-4000-8000-000000000001');
       setTimeout(() => {
         router.push('/matches');
@@ -116,7 +116,7 @@ export function LoginForm() {
   // 3. Quick Admin Access (Direct entry to matches)
   const handleQuickAdminAccess = () => {
     startTransition(async () => {
-      setMessage({ success: true, text: 'Accediendo como Administrador (Fabian Tellez)...' });
+      setMessage({ success: true, text: 'Entrando como Administrador...' });
       await switchUserAction('f0000000-0000-4000-8000-000000000001');
       router.push('/matches');
     });
@@ -133,17 +133,17 @@ export function LoginForm() {
           MIZPA SYSTEM
         </h1>
         <p className="text-xs sm:text-sm text-zinc-400">
-          Gestión de Partidos, Convocatorias WhatsApp y Billetera Financiera
+          Partidos, convocatorias por WhatsApp y control de pagos
         </p>
       </div>
 
       <Card className="border-zinc-800 bg-zinc-900/90 shadow-2xl backdrop-blur-md">
         <CardHeader className="pb-4 border-b border-zinc-800/80">
           <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-emerald-400" /> Iniciar Sesión Oficial
+            <ShieldCheck className="w-5 h-5 text-emerald-400" /> Ingreso al sistema
           </CardTitle>
           <CardDescription className="text-xs text-zinc-400">
-            Accede como Administrador u Organizador para gestionar el equipo.
+            Gestiona convocatorias, partidos y cobros del equipo.
           </CardDescription>
         </CardHeader>
 
@@ -192,7 +192,7 @@ export function LoginForm() {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
               </svg>
-              <span>{loading ? 'Conectando con Google...' : 'Continuar con Google'}</span>
+              <span>{loading ? 'Conectando...' : 'Continuar con Google'}</span>
             </Button>
           </div>
 
@@ -208,7 +208,7 @@ export function LoginForm() {
           <form onSubmit={handleEmailAuth} className="space-y-3.5">
             <div>
               <label className="text-xs font-medium text-zinc-300 block mb-1">
-                Correo Electrónico:
+                Correo electrónico:
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -250,10 +250,10 @@ export function LoginForm() {
               <Sparkles className="w-4 h-4" />
               <span>
                 {loading
-                  ? 'Procesando...'
+                  ? 'Entrando...'
                   : isMagicLinkMode
-                  ? 'Enviar Enlace Mágico al Correo'
-                  : 'Ingresar'}
+                  ? 'Enviar enlace al correo'
+                  : 'Entrar'}
               </span>
             </Button>
           </form>
@@ -266,8 +266,8 @@ export function LoginForm() {
               className="hover:text-emerald-400 underline transition-colors"
             >
               {isMagicLinkMode
-                ? '¿Prefieres ingresar con contraseña?'
-                : '¿Ingresar sin contraseña (Magic Link)?'}
+                ? '¿Prefieres entrar con contraseña?'
+                : '¿Entrar con enlace directo al correo?'}
             </button>
           </div>
 
@@ -280,7 +280,7 @@ export function LoginForm() {
               className="w-full border-zinc-700 bg-zinc-950/40 hover:bg-zinc-800 text-zinc-300 text-xs py-2 h-9 flex items-center justify-center gap-2"
             >
               <Crown className="w-3.5 h-3.5 text-amber-400" />
-              <span>Acceso Rápido Administrador (Fabian Tellez)</span>
+              <span>Acceso rápido administrador</span>
               <ArrowRight className="w-3 h-3 text-zinc-500" />
             </Button>
           </div>

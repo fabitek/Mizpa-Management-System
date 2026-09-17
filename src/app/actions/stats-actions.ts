@@ -37,13 +37,13 @@ export async function recordGoalAction(
 
     return {
       success: true,
-      message: 'Gol registrado exitosamente.',
+      message: 'Gol anotado en la planilla.',
       data: goal,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al registrar el gol.',
+      message: error instanceof Error ? error.message : 'No pudimos registrar el gol.',
     };
   }
 }
@@ -60,12 +60,12 @@ export async function deleteGoalAction(
 
     return {
       success: true,
-      message: 'Gol eliminado exitosamente.',
+      message: 'Gol eliminado de la planilla.',
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al eliminar el gol.',
+      message: error instanceof Error ? error.message : 'No pudimos borrar el gol.',
     };
   }
 }
@@ -77,13 +77,13 @@ export async function getMatchGoalsAction(
     const goals = await getMatchGoalsUseCase.execute(matchId);
     return {
       success: true,
-      message: 'Goles del partido obtenidos.',
+      message: 'Goles del partido listos.',
       data: goals,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al obtener goles del partido.',
+      message: error instanceof Error ? error.message : 'No pudimos cargar los goles.',
     };
   }
 }
@@ -93,13 +93,13 @@ export async function getTopScorersAction(): Promise<StatsActionResult> {
     const scorers = await getTopScorersUseCase.execute();
     return {
       success: true,
-      message: 'Tabla de goleadores obtenida exitosamente.',
+      message: 'Tabla de goleadores al día.',
       data: scorers,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al obtener la tabla de goleadores.',
+      message: error instanceof Error ? error.message : 'No pudimos consultar los goleadores.',
     };
   }
 }
@@ -109,13 +109,13 @@ export async function getPlayerStatsAction(playerId: string): Promise<StatsActio
     const stats = await getPlayerStatsUseCase.execute(playerId);
     return {
       success: true,
-      message: 'Estadísticas del jugador obtenidas exitosamente.',
+      message: 'Estadísticas del jugador cargadas.',
       data: stats,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al obtener estadísticas del jugador.',
+      message: error instanceof Error ? error.message : 'No pudimos consultar las estadísticas.',
     };
   }
 }
@@ -132,13 +132,13 @@ export async function assignMatchMvpAction(
 
     return {
       success: true,
-      message: 'Jugador del partido (MVP) asignado exitosamente.',
+      message: 'Figura del partido elegida.',
       data: updatedMatch,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al asignar MVP del partido.',
+      message: error instanceof Error ? error.message : 'No pudimos asignar la figura del partido.',
     };
   }
 }
@@ -150,13 +150,13 @@ export async function getLeaderboardOverviewAction(
     const overview = await getLeaderboardOverviewUseCase.execute(playerIds);
     return {
       success: true,
-      message: 'Cuadro de honor general obtenido exitosamente.',
+      message: 'Cuadro de honor al día.',
       data: overview,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al obtener cuadro general de honor.',
+      message: error instanceof Error ? error.message : 'No pudimos cargar el cuadro de honor.',
     };
   }
 }

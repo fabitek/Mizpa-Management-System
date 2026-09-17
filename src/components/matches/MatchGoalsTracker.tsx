@@ -97,7 +97,7 @@ export function MatchGoalsTracker({
   // Quick 1-Tap Record Goal
   const handleQuickGoal = (playerId: string) => {
     if (!playerId) {
-      setFeedback({ success: false, message: 'ID de jugador inválido.' });
+      setFeedback({ success: false, message: 'Elige un jugador válido.' });
       return;
     }
     setFeedback(null);
@@ -105,7 +105,7 @@ export function MatchGoalsTracker({
       const res = await recordGoalAction(match.id, playerId, undefined, 'OPEN_PLAY');
       if (res.success && res.data) {
         setGoals((prev) => [...prev, res.data as GoalEvent]);
-        setFeedback({ success: true, message: `¡GOL de ${getPlayerName(playerId)} anotado! ⚽🔥` });
+        setFeedback({ success: true, message: `¡Gol de ${getPlayerName(playerId)} anotado!` });
         if (onGoalRecorded) onGoalRecorded();
       } else {
         setFeedback({ success: false, message: res.message });
@@ -149,7 +149,7 @@ export function MatchGoalsTracker({
       );
       if (res.success && res.data) {
         setGoals((prev) => [...prev, res.data as GoalEvent]);
-        setFeedback({ success: true, message: `¡Gol registrado con éxito!` });
+        setFeedback({ success: true, message: '¡Gol anotado en la planilla!' });
         setSelectedPlayerForGoal(null);
         setCustomMinute('');
         setCustomGoalType('OPEN_PLAY');
@@ -182,7 +182,7 @@ export function MatchGoalsTracker({
     startTransition(async () => {
       const res = await assignMatchMvpAction(match.id, playerId);
       if (res.success) {
-        setFeedback({ success: true, message: `⭐ ¡${getPlayerName(playerId)} elegido como MVP!` });
+        setFeedback({ success: true, message: `¡${getPlayerName(playerId)} elegido figura del partido!` });
       } else {
         setFeedback({ success: false, message: res.message });
       }
@@ -236,11 +236,11 @@ export function MatchGoalsTracker({
         <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between shadow-md">
           <div className="space-y-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-              <Target className="w-4 h-4 text-emerald-400" /> Total Goles del Partido
+              <Target className="w-4 h-4 text-emerald-400" /> Goles del partido
             </span>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-black font-mono text-white">{totalMatchGoals}</span>
-              <span className="text-xs text-zinc-500">anotaciones registradas</span>
+              <span className="text-xs text-zinc-500">anotados</span>
             </div>
           </div>
           <div className="w-12 h-12 rounded-xl bg-emerald-950/80 border border-emerald-500/30 flex items-center justify-center text-2xl">
@@ -252,11 +252,11 @@ export function MatchGoalsTracker({
         <div className="bg-zinc-900/90 border border-amber-500/30 rounded-2xl p-4 flex flex-col justify-between shadow-md md:col-span-2">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-              <Star className="w-4 h-4 text-amber-400 fill-amber-400" /> Jugador Más Valioso (MVP ⭐)
+              <Star className="w-4 h-4 text-amber-400 fill-amber-400" /> Figura del partido (MVP)
             </span>
             {mvpPlayerId && (
               <Badge variant="outline" className="border-amber-500/40 text-amber-300 text-[10px] bg-amber-950/40">
-                Seleccionado
+                Elegido
               </Badge>
             )}
           </div>
@@ -267,7 +267,7 @@ export function MatchGoalsTracker({
               disabled={isPending}
               className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-amber-400 cursor-pointer"
             >
-              <option value="">-- Seleccionar MVP del Partido --</option>
+              <option value="">-- Elegir figura del partido --</option>
               {uniquePlayingPlayers.map((entry) => (
                 <option key={`mvp-${entry.playerId}`} value={entry.playerId}>
                   ⭐ {entry.fullName}
@@ -289,20 +289,20 @@ export function MatchGoalsTracker({
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
           <div className="space-y-0.5">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Trophy className="w-4 h-4 text-emerald-400" /> Registro de Goles por Jugador en Cancha
+              <Trophy className="w-4 h-4 text-emerald-400" /> Goles por jugador
             </h3>
             <p className="text-xs text-zinc-400">
-              Presiona <span className="text-emerald-400 font-semibold">+ Gol</span> para anotar en vivo.
+              Toca <span className="text-emerald-400 font-semibold">+ Gol</span> para sumarlo al marcador.
             </p>
           </div>
           <Badge variant="outline" className="text-xs border-zinc-700 text-zinc-300">
-            {playingRoster.length} jugadores en nómina
+            {playingRoster.length} en cancha
           </Badge>
         </div>
 
         {playingRoster.length === 0 ? (
           <div className="py-8 text-center text-xs text-zinc-500">
-            No hay jugadores confirmados en este partido para registrar goles.
+            Aún no hay jugadores confirmados en este partido.
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -344,7 +344,7 @@ export function MatchGoalsTracker({
                         type="button"
                         onClick={() => handleRemoveLatestPlayerGoal(entry.playerId)}
                         disabled={isPending}
-                        title="Restar 1 gol a este jugador"
+                        title="Restar gol"
                         className="p-1.5 rounded-lg bg-zinc-800 hover:bg-rose-900/50 text-zinc-400 hover:text-rose-300 transition-colors border border-zinc-700/60 cursor-pointer"
                       >
                         <Minus className="w-3.5 h-3.5" />
@@ -371,7 +371,7 @@ export function MatchGoalsTracker({
                         setSelectedPlayerForGoal(entry.playerId);
                         setCustomMinute('');
                       }}
-                      title="Registrar gol con minuto o tipo (penal/autogol)"
+                      title="Detalles del gol"
                       className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors border border-zinc-700/60 cursor-pointer text-[10px]"
                     >
                       ⚙️
@@ -389,9 +389,9 @@ export function MatchGoalsTracker({
         <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-emerald-400" /> Línea de Tiempo del Partido ({goals.length} Goles)
+              <Clock className="w-4 h-4 text-emerald-400" /> Goles del partido ({goals.length})
             </h3>
-            <span className="text-[11px] text-zinc-500">Orden cronológico</span>
+            <span className="text-[11px] text-zinc-500">En orden</span>
           </div>
 
           <div className="space-y-2">
@@ -423,7 +423,7 @@ export function MatchGoalsTracker({
                   type="button"
                   onClick={() => handleDeleteSpecificGoal(goal.id)}
                   disabled={isPending}
-                  title="Eliminar este gol"
+                  title="Borrar gol"
                   className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-950/40 rounded transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -440,7 +440,7 @@ export function MatchGoalsTracker({
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                ⚽ Registrar Gol Detallado
+                ⚽ Detalle del gol
               </h4>
               <button
                 type="button"
@@ -453,7 +453,7 @@ export function MatchGoalsTracker({
 
             <form onSubmit={handleSaveDetailedGoal} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-zinc-400 mb-1">Jugador Anotador</label>
+                <label className="block text-xs font-semibold text-zinc-400 mb-1">Anotador</label>
                 <div className="text-xs font-bold text-emerald-400 bg-zinc-950 px-3 py-2 rounded-xl border border-zinc-800">
                   {getPlayerName(selectedPlayerForGoal)}
                 </div>
@@ -461,7 +461,7 @@ export function MatchGoalsTracker({
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-400 mb-1">
-                  Minuto del Gol (Opcional)
+                  Minuto (opcional)
                 </label>
                 <input
                   type="number"
@@ -469,19 +469,19 @@ export function MatchGoalsTracker({
                   max="130"
                   value={customMinute}
                   onChange={(e) => setCustomMinute(e.target.value)}
-                  placeholder="Ej: 24 (minuto)"
+                  placeholder="Ej. 24"
                   className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-400 mb-1">Tipo de Gol</label>
+                <label className="block text-xs font-semibold text-zinc-400 mb-1">Tipo de anotación</label>
                 <select
                   value={customGoalType}
                   onChange={(e) => setCustomGoalType(e.target.value as GoalType)}
                   className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                 >
-                  <option value="OPEN_PLAY">⚽ Jugada en Vivo (Normal)</option>
+                  <option value="OPEN_PLAY">⚽ Jugada en cancha</option>
                   <option value="PENALTY">🎯 Penal</option>
                   <option value="OWN_GOAL">⚠️ Autogol</option>
                 </select>
@@ -503,7 +503,7 @@ export function MatchGoalsTracker({
                   disabled={isPending}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer"
                 >
-                  Confirmar Gol
+                  Guardar gol
                 </Button>
               </div>
             </form>

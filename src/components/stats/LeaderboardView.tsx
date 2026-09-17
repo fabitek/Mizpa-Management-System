@@ -77,7 +77,7 @@ export function LeaderboardView({
   const handleRecordGoal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeMatch) {
-      setFeedback({ success: false, message: 'No hay un partido activo para registrar goles.' });
+      setFeedback({ success: false, message: 'No hay un partido activo para anotar goles.' });
       return;
     }
     const minuteNum = goalMinute ? parseInt(goalMinute, 10) : undefined;
@@ -111,7 +111,7 @@ export function LeaderboardView({
   const handleAssignMvp = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeMatch) {
-      setFeedback({ success: false, message: 'No hay un partido activo para asignar MVP.' });
+      setFeedback({ success: false, message: 'No hay un partido activo para elegir la figura.' });
       return;
     }
     startTransition(async () => {
@@ -159,11 +159,11 @@ export function LeaderboardView({
               </Button>
             </Link>
             <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
-              🏆 Estadísticas Deportivas & Gamificación
+              🏆 Estadísticas y Goleadores
             </h1>
           </div>
           <p className="text-zinc-400 mt-1 text-sm">
-            Tabla de goleadores, rachas de asistencia, jugador del partido (MVP) e insignias de honor.
+            Tabla de goleadores, rachas de asistencia, figura del partido e insignias.
           </p>
         </div>
       </div>
@@ -180,7 +180,7 @@ export function LeaderboardView({
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-zinc-400">
-            Anotaciones registradas (jugada + penal).
+            Goles de jugada y penal.
           </CardContent>
         </Card>
 
@@ -252,10 +252,10 @@ export function LeaderboardView({
       <Card className="border-zinc-800 bg-gradient-to-b from-zinc-900/80 to-zinc-950/90 overflow-hidden">
         <CardHeader className="pb-2 text-center">
           <CardTitle className="text-lg flex items-center justify-center gap-2 text-amber-400">
-            <Trophy className="w-5 h-5" /> Podio de Honor de Goleadores
+            <Trophy className="w-5 h-5" /> Podio de Goleadores
           </CardTitle>
           <CardDescription className="text-xs">
-            Los máximos artilleros del Mizpa Management System.
+            Los máximos artilleros del equipo.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-4 pb-6">
@@ -285,7 +285,7 @@ export function LeaderboardView({
                 {top1Player ? top1Player.fullName : 'Vacante'}
               </p>
               <Badge variant="default" className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[10px] mt-0.5">
-                LÍDER PICHICHI
+                GOLEADOR
               </Badge>
               <p className="text-sm text-amber-400 font-mono font-bold mt-1">
                 {top1 ? `${top1.goals} Goles` : '-'}
@@ -338,7 +338,7 @@ export function LeaderboardView({
           onClick={() => setActiveTab('badges')}
           className="gap-2"
         >
-          <Award className="w-4 h-4" /> Insignias & Gamificación
+          <Award className="w-4 h-4" /> Insignias y Logros
         </Button>
         <Button
           variant={activeTab === 'record' ? 'default' : 'ghost'}
@@ -346,7 +346,7 @@ export function LeaderboardView({
           onClick={() => setActiveTab('record')}
           className="gap-2"
         >
-          <PlusCircle className="w-4 h-4" /> Registrar Gol en Cancha
+          <PlusCircle className="w-4 h-4" /> Anotar Gol
         </Button>
       </div>
 
@@ -363,7 +363,7 @@ export function LeaderboardView({
               </span>
             </CardTitle>
             <CardDescription className="text-xs">
-              Clasificación ordenada por goles a favor, eficiencia de partidos y goles de jugada.
+              Goles a favor, promedio por partido y goles de jugada.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -439,7 +439,7 @@ export function LeaderboardView({
               </span>
             </CardTitle>
             <CardDescription className="text-xs">
-              Mide la fidelidad de los jugadores evaluando partidos consecutivos jugados de forma cronológica.
+              Partidos consecutivos jugados por cada integrante.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -498,7 +498,7 @@ export function LeaderboardView({
                 <User className="w-4 h-4 text-emerald-400" /> Perfil de Jugador
               </CardTitle>
               <CardDescription className="text-xs">
-                Selecciona un jugador para inspeccionar sus distinciones y logros.
+                Selecciona un jugador para consultar sus logros y distinciones.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -543,7 +543,7 @@ export function LeaderboardView({
               <div className="pt-2 border-t border-zinc-800">
                 <form onSubmit={handleAssignMvp} className="space-y-3">
                   <div className="flex items-center gap-1.5 text-xs text-zinc-300 font-semibold">
-                    <Star className="w-3.5 h-3.5 text-yellow-400" /> Asignar MVP del Partido Actual
+                    <Star className="w-3.5 h-3.5 text-yellow-400" /> Elegir Figura del Partido (MVP)
                   </div>
                   <select
                     value={mvpPlayerId}
@@ -558,7 +558,7 @@ export function LeaderboardView({
                     ))}
                   </select>
                   <Button type="submit" size="sm" variant="outline" disabled={isPending} className="w-full text-xs">
-                    Confirmar MVP del Partido
+                    Confirmar Figura del Partido
                   </Button>
                 </form>
               </div>
@@ -571,14 +571,14 @@ export function LeaderboardView({
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center justify-between">
                   <span className="flex items-center gap-2">
-                    <Medal className="w-5 h-5 text-amber-400" /> Muro de Insignias & Trofeos
+                    <Medal className="w-5 h-5 text-amber-400" /> Insignias y Trofeos
                   </span>
                   <span className="text-xs font-normal text-zinc-400">
                     {playerStats.badges.filter((b: PlayerBadge) => b.unlocked).length} de {playerStats.badges.length} desbloqueadas
                   </span>
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Logros deportivos y de comportamiento otorgados automáticamente por el sistema.
+                  Logros deportivos desbloqueados según tu rendimiento.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -603,7 +603,7 @@ export function LeaderboardView({
                               variant={badge.unlocked ? 'success' : 'outline'}
                               className="text-[10px] font-mono"
                             >
-                              {badge.unlocked ? 'CONSEGUIDO' : 'BLOQUEADO'}
+                              {badge.unlocked ? 'DESBLOQUEADO' : 'BLOQUEADO'}
                             </Badge>
                           </div>
                           <p className="text-xs text-zinc-400">{badge.description}</p>
@@ -623,12 +623,12 @@ export function LeaderboardView({
         <Card className="border-zinc-800 bg-zinc-900/60 max-w-xl mx-auto">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <PlusCircle className="w-5 h-5 text-emerald-400" /> Registrar Gol en Partido Activo
+              <PlusCircle className="w-5 h-5 text-emerald-400" /> Registrar Gol del Partido
             </CardTitle>
             <CardDescription className="text-xs">
               {activeMatch
                 ? `Anota goles en tiempo real vinculados a ${activeMatch.location} (${new Date(activeMatch.date).toLocaleDateString('es-CO')}).`
-                : 'Crea o programa un partido para registrar goles en vivo.'}
+                : 'Programa o abre un partido para registrar goles en vivo.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -682,7 +682,7 @@ export function LeaderboardView({
                 variant="default"
                 className="w-full font-medium"
               >
-                {isPending ? 'Guardando Gol...' : 'Registrar Gol en el Sistema'}
+                {isPending ? 'Guardando...' : 'Guardar Gol'}
               </Button>
             </form>
           </CardContent>

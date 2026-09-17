@@ -17,17 +17,17 @@ export async function getCurrentSessionAction(): Promise<AuthActionResult<AuthSe
   try {
     const session = await authService.getCurrentSession();
     if (!session) {
-      return { success: false, message: 'No active session.' };
+      return { success: false, message: 'Sin sesión activa.' };
     }
     return {
       success: true,
-      message: 'Sesión activa obtenida.',
+      message: 'Sesión cargada.',
       data: session,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al obtener sesión.',
+      message: error instanceof Error ? error.message : 'No fue posible cargar la sesión.',
     };
   }
 }
@@ -40,13 +40,13 @@ export async function switchUserAction(playerId: string): Promise<AuthActionResu
 
     return {
       success: true,
-      message: `Sesión cambiada a ${newSession.user.fullName} (${newSession.user.role}).`,
+      message: `Perfil activo: ${newSession.user.fullName} (${newSession.user.role}).`,
       data: newSession,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al cambiar de usuario.',
+      message: error instanceof Error ? error.message : 'Fallo al cambiar usuario.',
     };
   }
 }

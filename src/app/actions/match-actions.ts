@@ -74,7 +74,7 @@ export async function settleMatchAction(
 
     return {
       success: true,
-      message: `Partido liquidado con éxito. Cuota congelada: $${result.settledFeePerPlayer.toLocaleString('es-CO')} por jugador.`,
+      message: `Partido liquidado. Cuota fijada en $${result.settledFeePerPlayer.toLocaleString('es-CO')} COP.`,
       data: {
         matchId: result.match.id,
         settledFeePerPlayer: result.settledFeePerPlayer,
@@ -87,7 +87,7 @@ export async function settleMatchAction(
     if (error instanceof MatchAlreadySettledError) {
       return {
         success: false,
-        message: 'El partido ya fue liquidado previamente y su cuota está congelada.',
+        message: 'Partido ya liquidado. Cuota inmutable.',
         errorCode: 'MATCH_ALREADY_SETTLED',
       };
     }
@@ -95,7 +95,7 @@ export async function settleMatchAction(
     if (error instanceof InvalidAttendanceStateError) {
       return {
         success: false,
-        message: 'No es posible liquidar: no se encontraron jugadores con estado ATTENDED.',
+        message: 'Sin jugadores presentes (ATTENDED) para liquidar.',
         errorCode: 'INVALID_ATTENDANCE_STATE',
       };
     }
@@ -103,13 +103,13 @@ export async function settleMatchAction(
     if (error instanceof InvalidFinancialAmountError) {
       return {
         success: false,
-        message: 'Monto financiero inválido durante el cálculo de la liquidación.',
+        message: 'Monto inválido para liquidación.',
         errorCode: 'INVALID_FINANCIAL_AMOUNT',
       };
     }
 
     const genericMessage =
-      error instanceof Error ? error.message : 'Error desconocido al liquidar el partido.';
+      error instanceof Error ? error.message : 'Fallo al liquidar partido.';
 
     return {
       success: false,
@@ -147,7 +147,7 @@ export async function createMatchAction(input: {
     if (isNaN(parsedDate.getTime())) {
       return {
         success: false,
-        message: 'Fecha y hora del partido no válidas.',
+        message: 'Fecha y hora inválidas.',
         errorCode: 'INVALID_DATE',
       };
     }
@@ -171,13 +171,13 @@ export async function createMatchAction(input: {
 
     return {
       success: true,
-      message: `¡Partido en ${newMatch.location} creado exitosamente con cupo de ${newMatch.maxPlayers} jugadores!`,
+      message: `Partido en ${newMatch.location} creado (${newMatch.maxPlayers} cupos).`,
       data: newMatch,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al crear el partido.',
+      message: error instanceof Error ? error.message : 'No se pudo crear el partido.',
       errorCode: 'CREATE_MATCH_ERROR',
     };
   }
@@ -208,13 +208,13 @@ export async function openMatchRegistrationAction(
     revalidatePath(`/rsvp/${matchId}`);
     return {
       success: true,
-      message: `Inscripciones abiertas con éxito para ${match.location}.`,
+      message: `Inscripciones abiertas en ${match.location}.`,
       data: match,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al abrir inscripciones.',
+      message: error instanceof Error ? error.message : 'Fallo al abrir inscripciones.',
     };
   }
 }
@@ -239,7 +239,7 @@ export async function updateMatchAction(input: {
       if (isNaN(parsedDate.getTime())) {
         return {
           success: false,
-          message: 'Fecha no válida.',
+          message: 'Fecha inválida.',
         };
       }
     }
@@ -264,12 +264,12 @@ export async function updateMatchAction(input: {
 
     const promoMsg =
       promotedAttendances.length > 0
-        ? ` Se promovieron automáticamente ${promotedAttendances.length} jugador(es) de lista de espera a CONFIRMADOS.`
+        ? ` ${promotedAttendances.length} promovido(s) de lista de espera a cancha.`
         : '';
 
     return {
       success: true,
-      message: `Convocatoria en ${match.location} actualizada correctamente.${promoMsg}`,
+      message: `Partido en ${match.location} actualizado.${promoMsg}`,
       data: match,
       promotedCount: promotedAttendances.length,
       promotedAttendances,
@@ -278,7 +278,7 @@ export async function updateMatchAction(input: {
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al actualizar la convocatoria.',
+      message: error instanceof Error ? error.message : 'Fallo al actualizar partido.',
     };
   }
 }
@@ -295,8 +295,8 @@ export async function reconcileMatchAttendancesAction(
 
     const msg =
       result.promotedCount > 0
-        ? `Sincronización exitosa: ${result.promotedCount} jugador(es) promovidos de lista de espera a CONFIRMADOS.`
-        : 'Cupos y lista de espera sincronizados. No hay jugadores pendientes por promover.';
+        ? `${result.promotedCount} promovidos de lista de espera a cancha.`
+        : 'Cupos al día. Sin promociones pendientes.';
 
     return {
       success: true,
@@ -309,7 +309,7 @@ export async function reconcileMatchAttendancesAction(
       message:
         error instanceof Error
           ? error.message
-          : 'Error al sincronizar lista de espera del partido.',
+          : 'Fallo al sincronizar cupos.',
     };
   }
 }
@@ -325,12 +325,12 @@ export async function deleteMatchAction(
 
     return {
       success: true,
-      message: 'Convocatoria eliminada correctamente.',
+      message: 'Partido eliminado.',
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al eliminar la convocatoria.',
+      message: error instanceof Error ? error.message : 'No se pudo eliminar el partido.',
     };
   }
 }

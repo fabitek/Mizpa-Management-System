@@ -1,5 +1,5 @@
 export class MatchAlreadySettledError extends Error {
-  constructor(message: string = 'Match is already settled.') {
+  constructor(message: string = 'Partido ya liquidado.') {
     super(message);
     this.name = 'MatchAlreadySettledError';
     Object.setPrototypeOf(this, new.target.prototype);
@@ -7,7 +7,7 @@ export class MatchAlreadySettledError extends Error {
 }
 
 export class MaxCapacityReachedError extends Error {
-  constructor(message: string = 'Maximum match capacity reached.') {
+  constructor(message: string = 'Cupos agotados en cancha.') {
     super(message);
     this.name = 'MaxCapacityReachedError';
     Object.setPrototypeOf(this, new.target.prototype);
@@ -15,7 +15,7 @@ export class MaxCapacityReachedError extends Error {
 }
 
 export class InvalidAttendanceStateError extends Error {
-  constructor(message: string = 'Invalid attendance state transition.') {
+  constructor(message: string = 'Cambio de estado no permitido.') {
     super(message);
     this.name = 'InvalidAttendanceStateError';
     Object.setPrototypeOf(this, new.target.prototype);
@@ -23,7 +23,7 @@ export class InvalidAttendanceStateError extends Error {
 }
 
 export class InvalidFinancialAmountError extends Error {
-  constructor(message: string = 'Invalid financial amount.') {
+  constructor(message: string = 'Monto inválido.') {
     super(message);
     this.name = 'InvalidFinancialAmountError';
     Object.setPrototypeOf(this, new.target.prototype);
@@ -31,7 +31,7 @@ export class InvalidFinancialAmountError extends Error {
 }
 
 export class MatchNotFoundError extends Error {
-  constructor(message: string = 'Match not found.') {
+  constructor(message: string = 'Partido no existe.') {
     super(message);
     this.name = 'MatchNotFoundError';
     Object.setPrototypeOf(this, new.target.prototype);
@@ -39,7 +39,7 @@ export class MatchNotFoundError extends Error {
 }
 
 export class MatchRegistrationClosedError extends Error {
-  constructor(message: string = 'Match registration is closed.') {
+  constructor(message: string = 'Inscripciones cerradas.') {
     super(message);
     this.name = 'MatchRegistrationClosedError';
     Object.setPrototypeOf(this, new.target.prototype);
@@ -47,7 +47,7 @@ export class MatchRegistrationClosedError extends Error {
 }
 
 export class PlayerAlreadyRegisteredError extends Error {
-  constructor(message: string = 'Player is already registered for this match.') {
+  constructor(message: string = 'Jugador ya inscrito en este partido.') {
     super(message);
     this.name = 'PlayerAlreadyRegisteredError';
     Object.setPrototypeOf(this, new.target.prototype);
@@ -55,7 +55,7 @@ export class PlayerAlreadyRegisteredError extends Error {
 }
 
 export class InvalidGoalDataError extends Error {
-  constructor(message: string = 'Invalid goal data.') {
+  constructor(message: string = 'Registro de gol inválido.') {
     super(message);
     this.name = 'InvalidGoalDataError';
     Object.setPrototypeOf(this, new.target.prototype);
@@ -63,7 +63,7 @@ export class InvalidGoalDataError extends Error {
 }
 
 export class GoalNotFoundError extends Error {
-  constructor(message: string = 'Goal event not found.') {
+  constructor(message: string = 'Gol no encontrado.') {
     super(message);
     this.name = 'GoalNotFoundError';
     Object.setPrototypeOf(this, new.target.prototype);
@@ -71,7 +71,7 @@ export class GoalNotFoundError extends Error {
 }
 
 export class UnauthorizedError extends Error {
-  constructor(message: string = 'Unauthorized: Insufficient permissions for this action.') {
+  constructor(message: string = 'Sin permisos para esta acción.') {
     super(message);
     this.name = 'UnauthorizedError';
     Object.setPrototypeOf(this, new.target.prototype);
@@ -79,7 +79,7 @@ export class UnauthorizedError extends Error {
 }
 
 export class NotificationDeliveryError extends Error {
-  constructor(message: string = 'Failed to deliver notification.') {
+  constructor(message: string = 'Error al enviar notificación.') {
     super(message);
     this.name = 'NotificationDeliveryError';
     Object.setPrototypeOf(this, new.target.prototype);

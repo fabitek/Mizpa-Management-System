@@ -83,7 +83,7 @@ export function ReceiptUploader({
 
   const processImageFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
-      alert('Por favor selecciona un archivo de imagen válido (PNG, JPG, WEBP).');
+      alert('Selecciona una imagen válida (PNG, JPG, WEBP).');
       return;
     }
 
@@ -262,7 +262,7 @@ export function ReceiptUploader({
                 <p className="text-[11px] text-zinc-400 mt-0.5">
                   {isScanning
                     ? '⚡ Escaneando comprobante con IA...'
-                    : 'Comprobante verificado y listo para respaldar la transacción.'}
+                    : 'Comprobante listo para registrar.'}
                 </p>
               </div>
             </div>
@@ -334,7 +334,7 @@ export function ReceiptUploader({
                 onClick={handleApplyOcrData}
                 className="w-full bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-500/40 text-xs py-1.5 h-auto rounded-lg gap-1.5 font-medium transition-all"
               >
-                <Zap className="w-3.5 h-3.5 text-amber-400" /> Aplicar Monto y Referencia al Formulario
+                <Zap className="w-3.5 h-3.5 text-amber-400" /> Usar Monto y Referencia
               </Button>
             </div>
           )}

@@ -50,14 +50,14 @@ export async function createPlayerAction(data: {
 
     return {
       success: true,
-      message: `Jugador ${player.fullName} guardado exitosamente.`,
+      message: `Jugador ${player.fullName} creado.`,
       data: player,
     };
   } catch (error) {
     console.error('Error creating player:', error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al crear el jugador.',
+      message: error instanceof Error ? error.message : 'No se pudo crear el jugador.',
     };
   }
 }
@@ -71,7 +71,7 @@ export async function updatePlayerAction(
     if (!existing) {
       return {
         success: false,
-        message: 'Jugador no encontrado.',
+        message: 'Jugador inexistente.',
       };
     }
 
@@ -95,14 +95,14 @@ export async function updatePlayerAction(
 
     return {
       success: true,
-      message: `Jugador ${updated.fullName} actualizado exitosamente.`,
+      message: `Jugador ${updated.fullName} actualizado.`,
       data: updated,
     };
   } catch (error) {
     console.error('Error updating player:', error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al actualizar el jugador.',
+      message: error instanceof Error ? error.message : 'Fallo al actualizar jugador.',
     };
   }
 }
@@ -113,7 +113,7 @@ export async function togglePlayerStatusAction(id: string): Promise<PlayerAction
     if (!existing) {
       return {
         success: false,
-        message: 'Jugador no encontrado.',
+        message: 'Jugador inexistente.',
       };
     }
 
@@ -129,14 +129,14 @@ export async function togglePlayerStatusAction(id: string): Promise<PlayerAction
 
     return {
       success: true,
-      message: `Estado de ${updated.fullName} cambiado a ${updated.isActive ? 'Activo' : 'Inactivo'}.`,
+      message: `${updated.fullName}: ahora ${updated.isActive ? 'Activo' : 'Inactivo'}.`,
       data: updated,
     };
   } catch (error) {
     console.error('Error toggling player status:', error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al cambiar estado del jugador.',
+      message: error instanceof Error ? error.message : 'Fallo al cambiar estado.',
     };
   }
 }
@@ -154,7 +154,7 @@ export async function bulkImportPlayersAction(
   if (!rawText || !rawText.trim()) {
     return {
       success: false,
-      message: 'No se ingresaron datos para importar.',
+      message: 'Sin datos para procesar.',
     };
   }
 
@@ -166,7 +166,7 @@ export async function bulkImportPlayersAction(
   if (lines.length === 0) {
     return {
       success: false,
-      message: 'No hay líneas válidas para procesar.',
+      message: 'Formato sin líneas válidas.',
     };
   }
 
@@ -241,7 +241,7 @@ export async function bulkImportPlayersAction(
 
   return {
     success: true,
-    message: `Importación completada: ${createdCount} creados, ${updatedCount} actualizados.${errors.length ? ` (${errors.length} errores)` : ''}`,
+    message: `Importación lista: ${createdCount} nuevos, ${updatedCount} actualizados.${errors.length ? ` (${errors.length} errores)` : ''}`,
     data: {
       createdCount,
       updatedCount,

@@ -319,12 +319,12 @@ export function MatchLiveStopwatch({
       : Math.min(100, (stopwatchSeconds / (durationHours * 3600)) * 100);
 
   const presets = [
-    { label: '5 min (Rápido)', mins: 5 },
-    { label: '7 min (Rotación)', mins: 7 },
-    { label: '10 min (Futsal)', mins: 10 },
-    { label: '15 min (Caimán)', mins: 15 },
-    { label: '20 min (Medio)', mins: 20 },
-    { label: '45 min (Oficial)', mins: 45 },
+    { label: '5 min', mins: 5 },
+    { label: '7 min', mins: 7 },
+    { label: '10 min', mins: 10 },
+    { label: '15 min', mins: 15 },
+    { label: '20 min', mins: 20 },
+    { label: '45 min', mins: 45 },
   ];
 
   return (
@@ -358,7 +358,7 @@ export function MatchLiveStopwatch({
             <Bell className="w-5 h-5 text-rose-400 animate-spin" />
             <div>
               <p className="text-sm font-black text-white tracking-wide">¡TIEMPO CUMPLIDO! ⏰⚽</p>
-              <p className="text-xs text-rose-300">Cambio de equipo o fin del periodo ({initialMinutes} min).</p>
+              <p className="text-xs text-rose-300">Cambio de equipos o fin del turno ({initialMinutes} min).</p>
             </div>
           </div>
           <Button
@@ -366,7 +366,7 @@ export function MatchLiveStopwatch({
             onClick={dismissAlarm}
             className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-3 py-1.5 shadow-lg shadow-rose-950"
           >
-            Detener Alarma
+            Silenciar
           </Button>
         </div>
       )}
@@ -379,7 +379,7 @@ export function MatchLiveStopwatch({
             <div className="flex items-center gap-2">
               <span className="text-xs font-black uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-emerald-400" />
-                {mode === 'COUNTDOWN' ? 'Temporizador de Partido' : 'Cronómetro Libre'}
+                {mode === 'COUNTDOWN' ? 'Temporizador' : 'Cronómetro'}
               </span>
               {mode === 'COUNTDOWN' && (
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">
@@ -396,7 +396,7 @@ export function MatchLiveStopwatch({
                   setSoundEnabled(!soundEnabled);
                   if (!soundEnabled) playMatchAlarmSound();
                 }}
-                title={soundEnabled ? 'Silenciar alarma' : 'Activar alarma sonora'}
+                title={soundEnabled ? 'Silenciar alarma' : 'Activar alarma'}
                 className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer flex items-center gap-1 ${
                   soundEnabled
                     ? 'bg-zinc-800 border-zinc-700 text-emerald-400 hover:bg-zinc-700'
@@ -404,13 +404,13 @@ export function MatchLiveStopwatch({
                 }`}
               >
                 {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-                <span className="text-[10px] hidden sm:inline">{soundEnabled ? 'Alarma ON' : 'Mute'}</span>
+                <span className="text-[10px] hidden sm:inline">{soundEnabled ? 'Alarma activa' : 'Silencio'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowConfig(!showConfig)}
-                title="Configurar tiempo personalizado"
+                title="Ajustar tiempo"
                 className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer flex items-center gap-1 ${
                   showConfig
                     ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
@@ -424,13 +424,13 @@ export function MatchLiveStopwatch({
           </div>
 
           <p className="text-xs text-zinc-500 truncate max-w-sm">
-            {matchLocation} • Sonará silbato y alarma al llegar a 00:00.
+            {matchLocation} • Alerta con silbato al llegar a 00:00.
           </p>
 
           {/* Quick Presets Bar */}
           <div className="flex items-center gap-1.5 flex-wrap pt-1">
             <span className="text-[10px] font-semibold text-zinc-400 uppercase mr-1 flex items-center gap-1">
-              <Flame className="w-3 h-3 text-amber-400" /> Presets:
+              <Flame className="w-3 h-3 text-amber-400" /> Tiempos:
             </span>
             {presets.map((p) => (
               <button
@@ -466,7 +466,7 @@ export function MatchLiveStopwatch({
               {formatTime(currentDisplaySeconds)}
             </span>
             <span className="font-mono text-xs font-bold text-zinc-500 uppercase">
-              {mode === 'COUNTDOWN' ? 'Restante' : 'Total'}
+              {mode === 'COUNTDOWN' ? 'Restante' : 'Tiempo'}
             </span>
           </div>
 
@@ -475,7 +475,7 @@ export function MatchLiveStopwatch({
             <button
               type="button"
               onClick={() => addSeconds(60)}
-              title="Sumar 1 minuto (+60s)"
+              title="Sumar 1 minuto"
               className="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors text-[10px] font-bold flex items-center justify-center cursor-pointer border border-zinc-700"
             >
               +1m
@@ -483,7 +483,7 @@ export function MatchLiveStopwatch({
             <button
               type="button"
               onClick={() => addSeconds(-60)}
-              title="Restar 1 minuto (-60s)"
+              title="Restar 1 minuto"
               className="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors text-[10px] font-bold flex items-center justify-center cursor-pointer border border-zinc-700"
             >
               -1m
@@ -509,7 +509,7 @@ export function MatchLiveStopwatch({
             ) : (
               <>
                 <Play className="w-4 h-4 fill-current" />
-                {currentDisplaySeconds === 0 && mode === 'COUNTDOWN' ? 'Reiniciar & Iniciar' : 'Iniciar'}
+                {currentDisplaySeconds === 0 && mode === 'COUNTDOWN' ? 'Reiniciar y arrancar' : 'Iniciar'}
               </>
             )}
           </Button>
@@ -519,7 +519,7 @@ export function MatchLiveStopwatch({
             size="sm"
             variant="outline"
             className="border-zinc-700 hover:bg-zinc-800 text-zinc-300 text-xs px-3 py-2.5 gap-1.5 cursor-pointer"
-            title="Reiniciar tiempo inicial"
+            title="Reiniciar reloj"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Reiniciar
@@ -529,7 +529,7 @@ export function MatchLiveStopwatch({
           <button
             type="button"
             onClick={playMatchAlarmSound}
-            title="Probar sonido de alarma / silbato"
+            title="Probar sonido de silbato"
             className="p-2.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-emerald-400 transition-colors border border-zinc-700/80 cursor-pointer"
           >
             <Volume2 className="w-4 h-4" />
@@ -544,7 +544,7 @@ export function MatchLiveStopwatch({
           className="mt-4 pt-3 border-t border-zinc-800 flex flex-wrap items-center gap-3 bg-zinc-950/50 p-3 rounded-xl"
         >
           <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-            <Settings2 className="w-3.5 h-3.5 text-emerald-400" /> Tiempo exacto por periodo:
+            <Settings2 className="w-3.5 h-3.5 text-emerald-400" /> Tiempo por periodo:
           </span>
           <div className="flex items-center gap-2">
             <input
@@ -563,7 +563,7 @@ export function MatchLiveStopwatch({
               size="sm"
               className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3 py-1"
             >
-              Establecer
+              Aplicar
             </Button>
           </div>
 
@@ -581,7 +581,7 @@ export function MatchLiveStopwatch({
                   : 'bg-zinc-800 text-zinc-400 hover:text-white'
               }`}
             >
-              Cuenta Regresiva
+              Regresiva
             </button>
             <button
               type="button"
@@ -595,7 +595,7 @@ export function MatchLiveStopwatch({
                   : 'bg-zinc-800 text-zinc-400 hover:text-white'
               }`}
             >
-              Ascendente
+              Cronómetro
             </button>
           </div>
         </form>

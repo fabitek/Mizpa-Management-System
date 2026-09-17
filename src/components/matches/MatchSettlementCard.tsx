@@ -237,7 +237,7 @@ export function MatchSettlementCard({
     e.preventDefault();
     if (!match) return;
     if (!editLocation.trim()) {
-      setFeedback({ success: false, message: 'La sede/cancha no puede estar vacía.' });
+      setFeedback({ success: false, message: 'Escribe la sede o cancha del partido.' });
       return;
     }
 
@@ -304,7 +304,7 @@ export function MatchSettlementCard({
   const handleCreateMatchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLocation.trim()) {
-      setFeedback({ success: false, message: 'La sede/cancha no puede estar vacía.' });
+      setFeedback({ success: false, message: 'Escribe la sede o cancha del partido.' });
       return;
     }
 
@@ -597,9 +597,9 @@ export function MatchSettlementCard({
     if (!text) return;
     const ok = await copyToClipboard(text);
     if (ok) {
-      setFeedback({ success: true, message: '📋 Nómina para Grupo de WhatsApp copiada al portapapeles.' });
+      setFeedback({ success: true, message: 'Nómina para WhatsApp copiada.' });
     } else {
-      setFeedback({ success: false, message: 'No se pudo copiar automáticamente. Puedes seleccionar el texto y copiarlo manualmente.' });
+      setFeedback({ success: false, message: 'No pudimos copiar el texto. Selecciónalo para copiarlo a mano.' });
     }
   };
 
@@ -608,9 +608,9 @@ export function MatchSettlementCard({
     if (!text) return;
     const ok = await copyToClipboard(text);
     if (ok) {
-      setFeedback({ success: true, message: '🏢 Planilla de Portería / Vigilancia copiada al portapapeles.' });
+      setFeedback({ success: true, message: 'Planilla de portería copiada.' });
     } else {
-      setFeedback({ success: false, message: 'No se pudo copiar automáticamente. Puedes seleccionar el texto y copiarlo manualmente.' });
+      setFeedback({ success: false, message: 'No pudimos copiar el texto. Selecciónalo para copiarlo a mano.' });
     }
   };
 
@@ -633,9 +633,9 @@ export function MatchSettlementCard({
     const text = `🚗 *PLANILLA DE VEHÍCULOS / PARQUEADERO - MIZPA FC*\n📍 *Sede:* ${match.location}\n📅 *Fecha:* ${formattedDate}\n\n${lines.join('\n')}\n\nTotal autorizados: ${vehicleList.length} vehículos.`;
     const ok = await copyToClipboard(text);
     if (ok) {
-      setFeedback({ success: true, message: 'Lista de parqueadero copiada al portapapeles para portería/vigilancia.' });
+      setFeedback({ success: true, message: 'Planilla de parqueadero copiada.' });
     } else {
-      setFeedback({ success: false, message: 'No se pudo copiar automáticamente. Puedes seleccionar el texto y copiarlo manualmente.' });
+      setFeedback({ success: false, message: 'No pudimos copiar el texto. Selecciónalo para copiarlo a mano.' });
     }
   };
 
@@ -687,7 +687,7 @@ export function MatchSettlementCard({
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
-              ⚽ Gestión de Partidos & Convocatorias
+              ⚽ Partidos y Convocatorias
             </h1>
             {match && (
               <Badge
@@ -753,7 +753,7 @@ export function MatchSettlementCard({
             </div>
           ) : (
             <p className="text-zinc-400 text-sm mt-1">
-              Panel de control y liquidación oficial de partidos Mizpa FC.
+              Control de convocatorias y liquidación de partidos.
             </p>
           )}
         </div>
@@ -765,7 +765,7 @@ export function MatchSettlementCard({
             size="default"
             className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-2 text-sm shadow-md"
           >
-            <PlusCircle className="w-4 h-4" /> Crear Nuevo Partido
+            <PlusCircle className="w-4 h-4" /> Nuevo partido
           </Button>
 
           {match && (
@@ -777,7 +777,7 @@ export function MatchSettlementCard({
                 className="border-amber-500/30 bg-amber-950/20 hover:bg-amber-900/40 text-amber-300 hover:text-amber-100 hover:border-amber-500/60 shadow-sm hover:shadow-amber-500/10 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 text-xs sm:text-sm font-semibold rounded-lg px-3.5 py-2 flex items-center gap-2 group"
               >
                 <Edit2 className="w-4 h-4 text-amber-400 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-200" />
-                <span>Editar Partido</span>
+                <span>Editar partido</span>
               </Button>
 
               {!isSettled && (
@@ -787,10 +787,10 @@ export function MatchSettlementCard({
                   size="default"
                   disabled={isPending}
                   className="border-sky-500/30 bg-sky-950/20 hover:bg-sky-900/40 text-sky-300 hover:text-sky-100 hover:border-sky-500/60 shadow-sm hover:shadow-sky-500/10 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 text-xs sm:text-sm font-semibold rounded-lg px-3.5 py-2 flex items-center gap-2 group"
-                  title="Sincronizar cupos y promover lista de espera"
+                  title="Sincronizar cupos y lista de espera"
                 >
                   <RefreshCw className={`w-4 h-4 text-sky-400 group-hover:rotate-180 transition-transform duration-500 ${isPending ? 'animate-spin' : ''}`} />
-                  <span>Sincronizar Cupos</span>
+                  <span>Sincronizar cupos</span>
                 </Button>
               )}
 
@@ -810,9 +810,9 @@ export function MatchSettlementCard({
                 variant="outline"
                 size="default"
                 className="border-emerald-600/70 bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-300 gap-1.5 font-semibold text-xs sm:text-sm shadow-sm"
-                title="Copiar nómina actualizada para WhatsApp o planilla para Portería/Vigilancia"
+                title="Copiar nómina actualizada para WhatsApp o planilla para portería"
               >
-                <Share2 className="w-4 h-4 text-emerald-400" /> 📲 Copiar Nómina & Portería
+                <Share2 className="w-4 h-4 text-emerald-400" /> 📲 Nómina y Portería
               </Button>
 
               <Link href="/notifications">
@@ -821,7 +821,7 @@ export function MatchSettlementCard({
                   size="default"
                   className="border-emerald-700/60 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 gap-1.5 font-medium text-xs sm:text-sm"
                 >
-                  <Share2 className="w-4 h-4 text-emerald-400" /> Convocatoria WhatsApp
+                  <Share2 className="w-4 h-4 text-emerald-400" /> Convocatorias
                 </Button>
               </Link>
 
@@ -838,11 +838,11 @@ export function MatchSettlementCard({
                   </span>
                 ) : isSettled ? (
                   <span className="flex items-center gap-1.5 text-emerald-400">
-                    <Lock className="w-4 h-4" /> Cuota Congelada
+                    <Lock className="w-4 h-4" /> Cuota fijada
                   </span>
                 ) : (
                   <span className="flex items-center gap-1.5">
-                    <DollarSign className="w-4 h-4" /> Liquidar Partido
+                    <DollarSign className="w-4 h-4" /> Liquidar partido
                   </span>
                 )}
               </Button>
@@ -857,10 +857,10 @@ export function MatchSettlementCard({
           <CardHeader className="pb-3 border-b border-zinc-800 flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-lg flex items-center gap-2 text-white">
-                <Sparkles className="w-5 h-5 text-emerald-400" /> Crear Nuevo Partido desde Cero
+                <Sparkles className="w-5 h-5 text-emerald-400" /> Nuevo partido
               </CardTitle>
               <CardDescription className="text-xs text-zinc-400">
-                Configura la sede, dirección con enlace a Google Maps, fecha, costos y cupo oficial de 18 jugadores para abrir la convocatoria al grupo de WhatsApp.
+                Configura sede, dirección, fecha, costos y cupo de jugadores para la convocatoria.
               </CardDescription>
             </div>
             <Button
@@ -877,7 +877,7 @@ export function MatchSettlementCard({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    📍 Nombre de la Sede / Cancha:
+                    Sede o cancha:
                   </label>
                   <input
                     type="text"
@@ -891,7 +891,7 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    🗺️ Dirección de la Cancha (para Google Maps):
+                    Dirección (Google Maps):
                   </label>
                   <input
                     type="text"
@@ -904,7 +904,7 @@ export function MatchSettlementCard({
 
                 <div className="sm:col-span-2">
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    🔗 Enlace de Google Maps (Opcional - se genera automáticamente si se deja vacío):
+                    Enlace de Google Maps (opcional):
                   </label>
                   <input
                     type="url"
@@ -917,7 +917,7 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    📅 Fecha y Hora del Partido:
+                    Fecha y hora:
                   </label>
                   <input
                     type="datetime-local"
@@ -930,7 +930,7 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    💵 Costo Alquiler Cancha (COP):
+                    Costo de la cancha (COP):
                   </label>
                   <input
                     type="number"
@@ -944,7 +944,7 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    ⏱️ Duración del Partido (Horas):
+                    Duración (horas):
                   </label>
                   <input
                     type="number"
@@ -962,7 +962,7 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    🚗 Tarifa Parqueadero por Hora (COP):
+                    Tarifa parqueadero por hora (COP):
                   </label>
                   <input
                     type="number"
@@ -979,7 +979,7 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    👥 Cupo Máximo de Jugadores:
+                    Cupo de jugadores:
                   </label>
                   <input
                     type="number"
@@ -990,7 +990,7 @@ export function MatchSettlementCard({
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   <p className="text-[11px] text-zinc-400 mt-1">
-                    Estándar oficial Mizpa FC: <strong>18 jugadores</strong>.
+                    Cupo habitual: <strong>18 jugadores</strong>.
                   </p>
                 </div>
 
@@ -1002,7 +1002,7 @@ export function MatchSettlementCard({
                       onChange={(e) => setNewOpenImmediately(e.target.checked)}
                       className="rounded border-zinc-700 bg-zinc-800 text-emerald-500 focus:ring-emerald-500"
                     />
-                    <span>Abrir inscripciones (Convocatoria activa) inmediatamente</span>
+                    <span>Abrir convocatoria de inmediato</span>
                   </label>
                 </div>
               </div>
@@ -1022,7 +1022,7 @@ export function MatchSettlementCard({
                   disabled={isPending}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-2"
                 >
-                  {isPending ? 'Creando Partido...' : '⚽ Guardar y Abrir Convocatoria'}
+                  {isPending ? 'Creando Partido...' : '⚽ Abrir convocatoria'}
                 </Button>
               </div>
             </form>
@@ -1036,10 +1036,10 @@ export function MatchSettlementCard({
           <CardHeader className="pb-3 border-b border-zinc-800 flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-lg flex items-center gap-2 text-white">
-                <Edit2 className="w-5 h-5 text-amber-400" /> Editar Convocatoria / Partido
+                <Edit2 className="w-5 h-5 text-amber-400" /> Editar partido
               </CardTitle>
               <CardDescription className="text-xs text-zinc-400">
-                Modifica los datos del partido, la cancha, el horario, el enlace a mapas, los costos o el cupo.
+                Ajusta sede, horarios, costos o cupos del partido.
               </CardDescription>
             </div>
             <Button
@@ -1056,7 +1056,7 @@ export function MatchSettlementCard({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    📍 Nombre de la Sede / Cancha:
+                    Sede o cancha:
                   </label>
                   <input
                     type="text"
@@ -1070,7 +1070,7 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    🗺️ Dirección de la Cancha (para Google Maps):
+                    Dirección (Google Maps):
                   </label>
                   <input
                     type="text"
@@ -1083,7 +1083,7 @@ export function MatchSettlementCard({
 
                 <div className="sm:col-span-2">
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    🔗 Enlace de Google Maps:
+                    Enlace de Google Maps:
                   </label>
                   <input
                     type="url"
@@ -1096,7 +1096,7 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    📅 Fecha y Hora del Partido:
+                    Fecha y hora:
                   </label>
                   <input
                     type="datetime-local"
@@ -1109,7 +1109,7 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    💵 Costo Alquiler Cancha (COP):
+                    Costo de la cancha (COP):
                   </label>
                   <input
                     type="number"
@@ -1123,7 +1123,7 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    ➕ Costos Extras (Petos/Árbitro) (COP):
+                    Costos extra (petos/árbitro) (COP):
                   </label>
                   <input
                     type="number"
@@ -1137,7 +1137,7 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    ⏱️ Duración del Partido (Horas):
+                    Duración (horas):
                   </label>
                   <input
                     type="number"
@@ -1152,7 +1152,7 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    🚗 Tarifa Parqueadero por Hora (COP):
+                    Tarifa parqueadero por hora (COP):
                   </label>
                   <input
                     type="number"
@@ -1166,7 +1166,7 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    👥 Cupo Máximo de Jugadores:
+                    Cupo de jugadores:
                   </label>
                   <input
                     type="number"
@@ -1180,17 +1180,17 @@ export function MatchSettlementCard({
 
                 <div>
                   <label className="text-xs font-semibold text-zinc-300 block mb-1">
-                    📌 Estado del Partido:
+                    Estado del partido:
                   </label>
                   <select
                     value={editStatus}
                     onChange={(e) => setEditStatus(e.target.value as MatchStatus)}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   >
-                    <option value="OPEN_REGISTRATION">OPEN_REGISTRATION (Convocatoria Abierta)</option>
-                    <option value="DRAFT">DRAFT (Borrador)</option>
-                    <option value="PLAYED">PLAYED (Jugado)</option>
-                    <option value="CANCELLED">CANCELLED (Cancelado)</option>
+                    <option value="OPEN_REGISTRATION">Convocatoria abierta (OPEN_REGISTRATION)</option>
+                    <option value="DRAFT">Borrador (DRAFT)</option>
+                    <option value="PLAYED">Jugado (PLAYED)</option>
+                    <option value="CANCELLED">Cancelado (CANCELLED)</option>
                   </select>
                 </div>
               </div>
@@ -1210,7 +1210,7 @@ export function MatchSettlementCard({
                   disabled={isPending}
                   className="bg-amber-600 hover:bg-amber-500 text-white font-bold gap-2"
                 >
-                  {isPending ? 'Guardando Cambios...' : '💾 Guardar Cambios'}
+                  {isPending ? 'Guardando Cambios...' : '💾 Guardar cambios'}
                 </Button>
               </div>
             </form>
@@ -1225,7 +1225,7 @@ export function MatchSettlementCard({
             <div className="flex items-center gap-2 text-emerald-400">
               <DollarSign className="w-5 h-5" />
               <CardTitle className="text-base font-bold text-emerald-200">
-                ¿Liquidar este partido y congelar cuotas?
+                ¿Liquidar partido y fijar cuotas?
               </CardTitle>
             </div>
             <Button
@@ -1241,7 +1241,7 @@ export function MatchSettlementCard({
           <CardContent className="pt-4 space-y-4">
             <div className="space-y-2 text-sm text-zinc-300">
               <p>
-                Estás a punto de liquidar oficialmente el partido en <strong className="text-white">{match.location}</strong>.
+                Vas a liquidar el partido en <strong className="text-white">{match.location}</strong>.
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-zinc-900/80 p-3 rounded-xl border border-zinc-800 text-xs">
                 <div>
@@ -1260,7 +1260,7 @@ export function MatchSettlementCard({
               <p className="text-xs text-amber-400/90 flex items-start gap-1.5">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
                 <span>
-                  Esta acción registrará los asientos de <strong>DÉBITO</strong> en el libro mayor contable para los asistentes y congelará el estado del partido como <strong>SETTLED</strong>.
+                  Se registrará el cobro para cada asistente y la cuota quedará liquidada.
                 </span>
               </p>
             </div>
@@ -1286,7 +1286,7 @@ export function MatchSettlementCard({
                   </>
                 ) : (
                   <>
-                    <DollarSign className="w-4 h-4" /> Sí, Liquidar Partido (Definitivo)
+                    <DollarSign className="w-4 h-4" /> Sí, Liquidar Partido
                   </>
                 )}
               </Button>
@@ -1302,7 +1302,7 @@ export function MatchSettlementCard({
             <div className="flex items-center gap-2 text-red-400">
               <Trash2 className="w-5 h-5" />
               <CardTitle className="text-base font-bold text-red-200">
-                ¿Eliminar esta convocatoria?
+                ¿Eliminar convocatoria?
               </CardTitle>
             </div>
             <Button
@@ -1316,7 +1316,7 @@ export function MatchSettlementCard({
           </CardHeader>
           <CardContent className="pt-4 space-y-3">
             <p className="text-sm text-zinc-300">
-              Estás a punto de eliminar el partido en <strong className="text-white">{match.location}</strong> programado para el{' '}
+              Vas a eliminar el partido en <strong className="text-white">{match.location}</strong> programado para el{' '}
               <strong className="text-white">
                 {new Date(match.date).toLocaleDateString('es-CO', {
                   timeZone: 'America/Bogota',
@@ -1329,7 +1329,7 @@ export function MatchSettlementCard({
               </strong>.
             </p>
             <p className="text-xs text-red-400/90">
-              ⚠️ Se eliminarán los registros de inscripción de este partido. Esta acción no se puede deshacer.
+              ⚠️ Se borrarán las inscripciones asociadas a este partido.
             </p>
             <div className="flex justify-end gap-2 pt-2">
               <Button
@@ -1360,10 +1360,10 @@ export function MatchSettlementCard({
           <CardHeader className="pb-3 border-b border-zinc-800 flex flex-row items-center justify-between">
             <div className="space-y-1">
               <CardTitle className="text-lg flex items-center gap-2 text-white">
-                <Share2 className="w-5 h-5 text-emerald-400" /> Nómina en Vivo y Planilla de Control
+                <Share2 className="w-5 h-5 text-emerald-400" /> Nómina en vivo y planilla
               </CardTitle>
               <CardDescription className="text-xs text-zinc-400">
-                Generación dinámica en tiempo real con cálculo de cuota prorrateada, lista de espera y control de acceso.
+                Lista actualizada con cuota calculada, lista de espera y control de portería.
               </CardDescription>
             </div>
             <Button
@@ -1388,7 +1388,7 @@ export function MatchSettlementCard({
                     : 'border-transparent text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                <span>💬 Grupo WhatsApp (Deportivo)</span>
+                <span>💬 Grupo de WhatsApp</span>
                 <Badge variant="outline" className="text-[10px] border-emerald-800 text-emerald-300">
                   {confirmedCount}/{maxPlayers}
                 </Badge>
@@ -1404,7 +1404,7 @@ export function MatchSettlementCard({
                 }`}
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>🏢 Portería & Vigilancia (Acceso)</span>
+                <span>🏢 Planilla de portería</span>
                 <Badge variant="outline" className="text-[10px] border-blue-800 text-blue-300">
                   {confirmedCount + companionCount} personas
                 </Badge>
@@ -1442,7 +1442,7 @@ export function MatchSettlementCard({
             {/* Text Preview Box */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs text-zinc-400">
-                <span>Vista previa del mensaje generado en vivo:</span>
+                <span>Vista previa del mensaje:</span>
                 <span className="font-mono text-[11px]">
                   {rosterTab === 'whatsapp' ? 'Formato WhatsApp' : 'Formato Portería'}
                 </span>
@@ -1457,8 +1457,8 @@ export function MatchSettlementCard({
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
               <p className="text-[11px] text-zinc-400">
                 {rosterTab === 'whatsapp'
-                  ? '💡 Incluye nómina numerada, acompañantes, cuota dinámica calculada y cupos restantes.'
-                  : '💡 Incluye cédulas, placas vehiculares registradas y conteo oficial para los guardas.'}
+                  ? '💡 Incluye nómina numerada, acompañantes, cuota por persona y cupos restantes.'
+                  : '💡 Incluye documentos de identidad, placas registradas y total de asistentes.'}
               </p>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -1467,7 +1467,7 @@ export function MatchSettlementCard({
                   size="sm"
                   className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold gap-1.5 shadow-md"
                 >
-                  <Copy className="w-3.5 h-3.5" /> Copiar al Portapapeles
+                  <Copy className="w-3.5 h-3.5" /> Copiar texto
                 </Button>
 
                 {rosterTab === 'whatsapp' && (
@@ -1507,7 +1507,7 @@ export function MatchSettlementCard({
             <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
           )}
           <div>
-            <p className="font-semibold text-sm">{feedback.success ? 'Operación Exitosa' : 'Aviso'}</p>
+            <p className="font-semibold text-sm">{feedback.success ? 'Listo' : 'Aviso'}</p>
             <p className="text-xs opacity-90">{feedback.message}</p>
           </div>
         </div>
@@ -1519,9 +1519,9 @@ export function MatchSettlementCard({
             ⚽
           </div>
           <div className="max-w-md mx-auto space-y-2">
-            <h2 className="text-xl font-bold text-white">¡No hay partidos registrados aún!</h2>
+            <h2 className="text-xl font-bold text-white">Aún no hay partidos creados</h2>
             <p className="text-sm text-zinc-400">
-              Comienza creando tu primer partido oficial. Se generará automáticamente el enlace de inscripción pública para compartir en tu grupo de WhatsApp.
+              Crea un partido para abrir la convocatoria y compartir el enlace de inscripción en el grupo.
             </p>
           </div>
           <div>
@@ -1530,7 +1530,7 @@ export function MatchSettlementCard({
               size="lg"
               className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-2 shadow-lg"
             >
-              <PlusCircle className="w-5 h-5" /> Crear Primer Partido
+              <PlusCircle className="w-5 h-5" /> Crear partido
             </Button>
           </div>
         </Card>
@@ -1547,7 +1547,7 @@ export function MatchSettlementCard({
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 shadow-sm">
               <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5 text-emerald-400" /> Nómina Oficial
+                <Users className="w-3.5 h-3.5 text-emerald-400" /> Nómina
               </div>
               <div className="mt-1 flex items-baseline gap-1.5">
                 <span className="text-xl font-black font-mono text-white">
@@ -1619,7 +1619,7 @@ export function MatchSettlementCard({
                 }`}
               >
                 <Users className="w-4 h-4" />
-                <span>Nómina & Asistencia</span>
+                <span>Nómina y asistencia</span>
                 <Badge variant="outline" className="text-[10px] border-emerald-800/80 text-emerald-300 py-0 px-1.5">
                   {confirmedCount}
                 </Badge>
@@ -1635,7 +1635,7 @@ export function MatchSettlementCard({
                 }`}
               >
                 <Target className="w-4 h-4" />
-                <span>Goles & Marcador ⚽</span>
+                <span>Goles y marcador</span>
               </button>
 
               <button
@@ -1666,7 +1666,7 @@ export function MatchSettlementCard({
                 }`}
               >
                 <Share2 className="w-4 h-4" />
-                <span>Difusión & Portería</span>
+                <span>Difusión y portería</span>
               </button>
             </div>
 
@@ -1683,7 +1683,7 @@ export function MatchSettlementCard({
                 <Card className="border-zinc-800/80 bg-zinc-900/40">
                   <CardHeader className="py-3 px-4">
                     <CardTitle className="text-xs font-semibold flex items-center gap-2 text-zinc-300">
-                      <UserPlus className="w-3.5 h-3.5 text-emerald-400" /> Registrar Invitado (+1)
+                      <UserPlus className="w-3.5 h-3.5 text-emerald-400" /> Agregar invitado
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="px-4 pb-4 pt-0">
@@ -1709,8 +1709,8 @@ export function MatchSettlementCard({
                           onChange={(e) => setGuestTypeForNewGuest(e.target.value as 'PLAYER' | 'COMPANION')}
                           className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                         >
-                          <option value="PLAYER">⚽ Invitado Jugador (Juega)</option>
-                          <option value="COMPANION">👥 Acompañante (No juega - $0)</option>
+                          <option value="PLAYER">⚽ Invitado (juega)</option>
+                          <option value="COMPANION">👥 Acompañante (no juega)</option>
                         </select>
                       </div>
                       <div className="w-full sm:flex-1">
@@ -1746,7 +1746,7 @@ export function MatchSettlementCard({
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                          Recaudos & Transferencias (Nequi & Efectivo)
+                          Cobros y transferencias
                         </h3>
                         <Badge
                           variant={paidPlayersCount === playingAttendances.length && playingAttendances.length > 0 ? 'success' : 'default'}
@@ -1756,7 +1756,7 @@ export function MatchSettlementCard({
                         </Badge>
                       </div>
                       <p className="text-xs text-zinc-400">
-                        Control en tiempo real de pagos y transferencias registradas por cada jugador.
+                        Seguimiento de pagos en efectivo y transferencias por jugador.
                       </p>
                     </div>
                   </div>
@@ -1809,7 +1809,7 @@ export function MatchSettlementCard({
               <Card className="border-zinc-800 bg-zinc-900/60 shadow-md overflow-hidden">
                 <CardHeader className="py-3 px-4 border-b border-zinc-800 flex flex-row items-center justify-between gap-2">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2 text-white">
-                    <Users className="w-4 h-4 text-emerald-400" /> Nómina Oficial de Jugadores ({confirmedCount}/{maxPlayers})
+                    <Users className="w-4 h-4 text-emerald-400" /> Nómina de jugadores ({confirmedCount}/{maxPlayers})
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     <Button
@@ -1830,7 +1830,7 @@ export function MatchSettlementCard({
                 <CardContent className="p-0">
                   {attendances.filter((a) => a.guestType !== 'COMPANION').length === 0 ? (
                     <div className="p-8 text-center text-zinc-500 text-sm">
-                      Aún no hay jugadores inscritos para este partido.
+                      Aún no hay jugadores inscritos.
                     </div>
                   ) : (
                     <Table>
@@ -1840,7 +1840,7 @@ export function MatchSettlementCard({
                           <TableHead>Jugador</TableHead>
                           <TableHead>Asistencia</TableHead>
                           <TableHead>Cuota Cancha</TableHead>
-                          <TableHead>Estado de Pago 💵</TableHead>
+                          <TableHead>Estado del pago</TableHead>
                           {!isSettled && <TableHead className="text-right">Acciones</TableHead>}
                         </TableRow>
                       </TableHeader>
@@ -1971,7 +1971,7 @@ export function MatchSettlementCard({
                                             title="Registrar pago recibido en efectivo"
                                           >
                                             <Banknote className="w-3.5 h-3.5 mr-1" />
-                                            {payment.isPartial ? 'Completar $' : '💵 Cobrar $'}
+                                            {payment.isPartial ? 'Completar' : 'Cobrar'}
                                           </Button>
                                         )
                                       )}
@@ -2016,7 +2016,7 @@ export function MatchSettlementCard({
                 <Card className="border-blue-900/40 bg-zinc-900/40 shadow-sm overflow-hidden">
                   <CardHeader className="py-2.5 px-4 border-b border-zinc-800 flex flex-row items-center justify-between">
                     <CardTitle className="text-xs font-semibold flex items-center gap-2 text-blue-300">
-                      <Users className="w-3.5 h-3.5 text-blue-400" /> Acompañantes & Barra ({companionCount}) — No pagan cancha
+                      <Users className="w-3.5 h-3.5 text-blue-400" /> Acompañantes ({companionCount})
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -2088,10 +2088,10 @@ export function MatchSettlementCard({
                 <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                   <div>
                     <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <DollarSign className="w-5 h-5 text-emerald-400" /> Resumen de Liquidación
+                      <DollarSign className="w-5 h-5 text-emerald-400" /> Resumen de liquidación
                     </h3>
                     <p className="text-xs text-zinc-400">
-                      Cálculo final de cuotas, egresos y recaudación del partido.
+                      Cuotas, costos y recaudación final del partido.
                     </p>
                   </div>
                   <Button
@@ -2135,7 +2135,7 @@ export function MatchSettlementCard({
                 {/* Per-player payment breakdown in Finances tab */}
                 <div className="pt-2">
                   <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
-                    Desglose Individual de Pagos & Transferencias
+                    Detalle de pagos por jugador
                   </h4>
                   <div className="border border-zinc-800 rounded-xl overflow-hidden">
                     <Table>
@@ -2219,10 +2219,10 @@ export function MatchSettlementCard({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
                   <div>
                     <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <Share2 className="w-5 h-5 text-emerald-400" /> Convocatoria & Acceso a Portería
+                      <Share2 className="w-5 h-5 text-emerald-400" /> Convocatoria y acceso a portería
                     </h3>
                     <p className="text-xs text-zinc-400">
-                      Textos formateados listos para copiar con 1 toque.
+                      Mensajes listos para copiar y enviar.
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -2268,7 +2268,7 @@ export function MatchSettlementCard({
                   <DollarSign className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Registrar Efectivo</h3>
+                  <h3 className="text-base font-bold text-white">Registrar pago en efectivo</h3>
                   <p className="text-xs text-zinc-400">{cashModalPlayer.name}</p>
                 </div>
               </div>
@@ -2319,7 +2319,7 @@ export function MatchSettlementCard({
                 onClick={handleRecordCashPayment}
                 className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-1"
               >
-                {isPending ? 'Guardando...' : 'Confirmar 💵'}
+                {isPending ? 'Guardando...' : 'Confirmar pago'}
               </Button>
             </div>
           </div>
@@ -2337,7 +2337,7 @@ export function MatchSettlementCard({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    Historial de Recaudos & Transferencias
+                    Historial de pagos y transferencias
                   </h3>
                   <p className="text-xs text-zinc-400">
                     {match.location} • {matchFinancialCredits.length} pagos registrados
@@ -2358,7 +2358,7 @@ export function MatchSettlementCard({
               {matchFinancialCredits.length === 0 ? (
                 <div className="py-12 text-center text-zinc-500 text-xs space-y-2">
                   <div className="text-3xl">🪙</div>
-                  <p>Aún no se han registrado pagos o transferencias para este partido.</p>
+                  <p>No hay pagos registrados para este partido todavía.</p>
                   <p className="text-zinc-600 text-[11px]">
                     Los pagos por Nequi o efectivo en cancha aparecerán aquí automáticamente.
                   </p>

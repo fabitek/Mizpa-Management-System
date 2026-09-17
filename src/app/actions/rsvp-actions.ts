@@ -40,13 +40,13 @@ export async function createPlayerAction(input: {
     revalidatePath('/wallet');
     return {
       success: true,
-      message: `Jugador ${player.fullName} registrado correctamente.`,
+      message: `Jugador ${player.fullName} registrado.`,
       data: player,
     };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al registrar jugador.',
+      message: error instanceof Error ? error.message : 'No se pudo registrar el jugador.',
       errorCode: 'CREATE_PLAYER_ERROR',
     };
   }
@@ -76,15 +76,15 @@ export async function registerAttendanceAction(
     const isCompanion = guestType === 'COMPANION';
     const displayName = guestName
       ? isCompanion
-        ? `Acompañante (+1: ${guestName} - No juega)`
-        : `Invitado (+1: ${guestName} - Jugador)`
+        ? `Acompañante (+1: ${guestName})`
+        : `Invitado (+1: ${guestName})`
       : 'Jugador';
     const vehicleMsg = hasVehicle && vehiclePlate ? ` (Vehículo: ${vehiclePlate.toUpperCase()})` : '';
     const statusMsg = isCompanion
-      ? `${displayName}${vehicleMsg} registrado como ACOMPAÑANTE / ESPECTADOR.`
+      ? `${displayName}${vehicleMsg}: registrado como acompañante.`
       : result.isWaitlist
-      ? `${displayName}${vehicleMsg} ingresó en LISTA DE ESPERA (Cupo lleno).`
-      : `${displayName}${vehicleMsg} CONFIRMADO en cancha (${result.activeConfirmedCount}/${result.maxPlayers}).`;
+      ? `${displayName}${vehicleMsg}: en lista de espera (cupos llenos).`
+      : `${displayName}${vehicleMsg}: cupo confirmado (${result.activeConfirmedCount}/${result.maxPlayers}).`;
 
     // Automated 10-player capacity check trigger
     try {
@@ -104,28 +104,28 @@ export async function registerAttendanceAction(
     if (error instanceof PlayerAlreadyRegisteredError) {
       return {
         success: false,
-        message: 'Este jugador o invitado ya está registrado para este partido.',
+        message: 'Ya inscrito en este partido.',
         errorCode: 'ALREADY_REGISTERED',
       };
     }
     if (error instanceof MatchRegistrationClosedError) {
       return {
         success: false,
-        message: 'Las inscripciones para este partido no están abiertas.',
+        message: 'Inscripciones cerradas para este partido.',
         errorCode: 'REGISTRATION_CLOSED',
       };
     }
     if (error instanceof MatchNotFoundError) {
       return {
         success: false,
-        message: 'Partido no encontrado.',
+        message: 'Partido inexistente.',
         errorCode: 'MATCH_NOT_FOUND',
       };
     }
 
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error desconocido al inscribir.',
+      message: error instanceof Error ? error.message : 'Fallo al procesar inscripción.',
       errorCode: 'UNKNOWN_ERROR',
     };
   }
@@ -139,9 +139,9 @@ export async function cancelAttendanceAction(
 
     revalidatePath('/matches');
 
-    let msg = 'Inscripción cancelada correctamente.';
+    let msg = 'Inscripción cancelada.';
     if (result.promotedAttendance) {
-      msg += ` ¡Se promovió automáticamente a un jugador de la Lista de Espera a CONFIRMADO!`;
+      msg += ` Cupo asignado al siguiente en lista de espera.`;
       // Trigger automated 10-player capacity check if promotion completed 10 players
       try {
         await checkAndNotifyCapacityReachedUseCase.execute({
@@ -161,14 +161,14 @@ export async function cancelAttendanceAction(
     if (error instanceof MatchAlreadySettledError) {
       return {
         success: false,
-        message: 'No se puede cancelar la asistencia: el partido ya fue liquidado.',
+        message: 'Partido ya liquidado. No se puede cancelar asistencia.',
         errorCode: 'MATCH_ALREADY_SETTLED',
       };
     }
 
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al cancelar la inscripción.',
+      message: error instanceof Error ? error.message : 'No se pudo cancelar la inscripción.',
       errorCode: 'UNKNOWN_ERROR',
     };
   }
@@ -185,8 +185,8 @@ export async function checkinAttendanceAction(
 
     const msg =
       status === 'ATTENDED'
-        ? 'Asistencia marcada como PRESENTE (ATTENDED).'
-        : 'Asistencia reajustada a CONFIRMADO (sin check-in aún).';
+        ? 'Asistencia confirmada en cancha (ATTENDED).'
+        : 'Check-in revertido a CONFIRMADO.';
 
     return {
       success: true,
@@ -197,7 +197,7 @@ export async function checkinAttendanceAction(
     if (error instanceof MatchAlreadySettledError) {
       return {
         success: false,
-        message: 'El partido ya fue liquidado, no se puede alterar el check-in.',
+        message: 'Partido liquidado. Asistencia bloqueada.',
         errorCode: 'MATCH_ALREADY_SETTLED',
       };
     }
@@ -211,7 +211,7 @@ export async function checkinAttendanceAction(
 
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al actualizar el check-in.',
+      message: error instanceof Error ? error.message : 'Fallo al actualizar check-in.',
       errorCode: 'UNKNOWN_ERROR',
     };
   }
@@ -227,13 +227,13 @@ export async function openMatchRegistrationAction(
 
     return {
       success: true,
-      message: `Inscripciones abiertas con éxito para el partido en ${match.location}.`,
+      message: `Inscripciones abiertas en ${match.location}.`,
       data: match,
     };
   } catch (error: unknown) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al abrir inscripciones.',
+      message: error instanceof Error ? error.message : 'Fallo al abrir inscripciones.',
       errorCode: 'UNKNOWN_ERROR',
     };
   }
@@ -248,7 +248,7 @@ export async function updateAttendanceGuestTypeAction(
     if (!attendance) {
       return {
         success: false,
-        message: 'Registro de asistencia no encontrado.',
+        message: 'Asistencia no encontrada.',
         errorCode: 'ATTENDANCE_NOT_FOUND',
       };
     }
@@ -263,16 +263,16 @@ export async function updateAttendanceGuestTypeAction(
     revalidatePath('/matches');
     revalidatePath(`/rsvp/${attendance.matchId}`);
 
-    const typeLabel = guestType === 'COMPANION' ? 'Acompañante (No juega)' : 'Invitado Jugador (Juega cancha)';
+    const typeLabel = guestType === 'COMPANION' ? 'Acompañante (no juega)' : 'Invitado (juega cancha)';
     return {
       success: true,
-      message: `Tipo de invitado cambiado a: ${typeLabel}`,
+      message: `Rol de invitado: ${typeLabel}.`,
       data: updatedAttendance,
     };
   } catch (error: unknown) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error al actualizar tipo de invitado.',
+      message: error instanceof Error ? error.message : 'No se pudo cambiar rol de invitado.',
       errorCode: 'UNKNOWN_ERROR',
     };
   }

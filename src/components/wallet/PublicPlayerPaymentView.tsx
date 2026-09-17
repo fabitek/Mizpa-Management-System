@@ -122,14 +122,14 @@ export function PublicPlayerPaymentView({
   const handleSubmitPayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlayer) {
-      setFeedback({ success: false, message: 'Por favor selecciona tu nombre de jugador.' });
+      setFeedback({ success: false, message: 'Selecciona tu nombre de jugador.' });
       return;
     }
     
     // Strict validation: Only allow 8500
     const finalAmount = 8500;
     if (Number(amount) !== 8500) {
-      setFeedback({ success: false, message: 'El sistema solo permite abonos exactos de $8.500 COP por seguridad.' });
+      setFeedback({ success: false, message: 'El abono fijado es de $8.500 COP.' });
       return;
     }
 
@@ -150,7 +150,7 @@ export function PublicPlayerPaymentView({
           setFeedback(res);
         }
       } catch (err) {
-        setFeedback({ success: false, message: 'Error de conexión al procesar el pago.' });
+        setFeedback({ success: false, message: 'Error de conexión al registrar el abono.' });
       }
     });
   };
@@ -166,7 +166,7 @@ export function PublicPlayerPaymentView({
           Abonar a mi Cuenta de Jugador ⚽
         </h1>
         <p className="text-xs sm:text-sm text-zinc-400 max-w-md mx-auto">
-          Transfiere tu cuota de partido o saldo anticipado y adjunta tu comprobante aquí para registrar tu abono automáticamente.
+          Transfiere tu cuota y sube el comprobante para registrar tu abono al instante.
         </p>
       </div>
 
@@ -182,7 +182,7 @@ export function PublicPlayerPaymentView({
             </Badge>
             <h2 className="text-2xl font-bold text-white">¡Abono Registrado con Éxito!</h2>
             <p className="text-sm text-emerald-300 mt-1">
-              Tu transferencia de <strong className="font-mono text-white">${Number(amount).toLocaleString('es-CO')} COP</strong> ha sido procesada y registrada en tu cuenta.
+              Tu transferencia de <strong className="font-mono text-white">${Number(amount).toLocaleString('es-CO')} COP</strong> quedó registrada en tu cuenta.
             </p>
           </div>
 
@@ -238,7 +238,7 @@ export function PublicPlayerPaymentView({
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
                 <User className="w-4 h-4 text-emerald-400" />
-                1. ¿A nombre de quién es el abono?
+                1. ¿Quién realiza el abono?
               </label>
               {selectedPlayer && (
                 <button
@@ -306,7 +306,7 @@ export function PublicPlayerPaymentView({
                       ))
                     ) : (
                       <div className="p-3 text-center text-xs text-zinc-500">
-                        No se encontró ningún jugador con ese criterio.
+                        No se encontró ningún jugador con ese nombre o documento.
                       </div>
                     )}
                   </div>
@@ -491,7 +491,7 @@ export function PublicPlayerPaymentView({
               {isPending ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  Procesando comprobante...
+                  Guardando comprobante...
                 </>
               ) : (
                 <>
