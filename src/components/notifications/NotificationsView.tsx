@@ -188,8 +188,14 @@ export function NotificationsView({
 
   // Helper to compute a player's fee, attendances, and balance
   const getPlayerMatchBreakdown = (playerId: string) => {
-    const playerAtt = matchAttendances.find((a) => a.playerId === playerId && a.status !== 'CANCELLED');
-    const guestAtts = matchAttendances.filter((a) => a.registeredByPlayerId === playerId && a.status !== 'CANCELLED');
+    // 1. Attendance of the player themselves (must not have guestName and must be confirmed/attended)
+    const playerAtt = matchAttendances.find(
+      (a) => a.playerId === playerId && !a.guestName && (isSettled ? a.status === 'ATTENDED' : a.status !== 'CANCELLED')
+    );
+    // 2. Attendances of guests registered by this player
+    const guestAtts = matchAttendances.filter(
+      (a) => a.registeredByPlayerId === playerId && Boolean(a.guestName) && (isSettled ? a.status === 'ATTENDED' : a.status !== 'CANCELLED')
+    );
 
     const isAttending = !!playerAtt;
     const isPlaying = playerAtt ? playerAtt.guestType !== 'COMPANION' : false;
@@ -200,7 +206,10 @@ export function NotificationsView({
     const parkingFee = hasVehicle ? vehicleParkingFee : 0;
 
     const guestPlayers = guestAtts.filter((g) => g.guestType !== 'COMPANION');
-    const guestsFee = guestPlayers.length * basePitchFee;
+    const guestsFee = guestPlayers.reduce(
+      (acc, g) => acc + basePitchFee + (g.hasVehicle || g.vehiclePlate ? vehicleParkingFee : 0),
+      0
+    );
 
     const totalTargetFee = pitchFee + parkingFee + guestsFee;
 
@@ -213,7 +222,7 @@ export function NotificationsView({
     const totalDebits = playerDebits.reduce((s, e) => s + e.amount, 0);
     const walletBalance = totalPaid - totalDebits;
 
-    const isPaid = totalTargetFee > 0 ? totalPaid >= totalTargetFee : (isAttending ? totalPaid > 0 : true);
+    const isPaid = totalTargetFee > 0 ? totalPaid >= totalTargetFee : (isAttending || guestPlayers.length > 0 ? totalPaid > 0 : true);
     const isPartial = totalPaid > 0 && totalPaid < totalTargetFee;
     const pendingAmount = Math.max(0, totalTargetFee - totalPaid);
 
@@ -235,6 +244,28 @@ export function NotificationsView({
       isPartial,
       walletBalance,
     };
+  };
+
+  const getMatchPayersSummary = () => {
+    const activeAtts = matchAttendances.filter(
+      (a) => a.guestType !== 'COMPANION' && (isSettled ? a.status === 'ATTENDED' : a.status !== 'CANCELLED')
+    );
+
+    const payerIds = Array.from(
+      new Set(activeAtts.map((a) => a.registeredByPlayerId || a.playerId))
+    );
+
+    return payerIds
+      .map((payerId) => {
+        const player = getPlayer(payerId);
+        if (!player) return null;
+        const info = getPlayerMatchBreakdown(payerId);
+        return {
+          player,
+          info,
+        };
+      })
+      .filter((item): item is { player: Player; info: ReturnType<typeof getPlayerMatchBreakdown> } => item !== null);
   };
 
   const formattedDate = currentMatch
@@ -288,7 +319,9 @@ export function NotificationsView({
     const playerPaymentLink = `${baseDomain.replace(/\/+$/, '')}/pago?player=${player.id}`;
 
     const detailLines: string[] = [];
-    detailLines.push(`• Cancha: $${(info.pitchFee || basePitchFee).toLocaleString('es-CO')} COP`);
+    if (info.isPlaying) {
+      detailLines.push(`• Cancha: $${info.pitchFee.toLocaleString('es-CO')} COP`);
+    }
     if (info.hasVehicle) {
       detailLines.push(`• Parqueadero (${durationHours}h): $${info.parkingFee.toLocaleString('es-CO')} COP${info.vehiclePlate ? ` [Placa ${info.vehiclePlate}]` : ''}`);
     }
@@ -322,14 +355,10 @@ export function NotificationsView({
   // Generate WhatsApp Group Broadcast with list of unpaid players (1-Click)
   const generateGroupSettlementDebtorsMessage = () => {
     if (!currentMatch) return '';
-    const matchAttendees = playingAttendances.map((att) => {
-      const p = getPlayer(att.playerId);
-      const info = getPlayerMatchBreakdown(att.playerId);
-      return { att, player: p, info };
-    });
+    const matchPayers = getMatchPayersSummary();
 
-    const unpaid = matchAttendees.filter((item) => !item.info.isPaid);
-    const paid = matchAttendees.filter((item) => item.info.isPaid);
+    const unpaid = matchPayers.filter((item) => !item.info.isPaid);
+    const paid = matchPayers.filter((item) => item.info.isPaid);
     const generalPaymentLink = `${baseDomain.replace(/\/+$/, '')}/pago`;
 
     let text = `💰 *ESTADO DE CUOTAS Y PAGOS • MIZPA FC* ⚽\n\n`;
@@ -340,9 +369,16 @@ export function NotificationsView({
     if (unpaid.length > 0) {
       text += `🔴 *PENDIENTES POR PAGAR (${unpaid.length} jugadores):*\n`;
       unpaid.forEach((item, idx) => {
-        const name = item.player ? item.player.fullName : (item.att.guestName || 'Jugador');
+        const name = item.player.fullName;
         const amount = item.info.pendingAmount > 0 ? item.info.pendingAmount : (item.info.totalTargetFee || basePitchFee);
-        const extras = item.info.hasVehicle ? ' (+Parqueadero)' : item.info.guestPlayers.length > 0 ? ' (+Invitado)' : '';
+        
+        let extras = '';
+        if (item.info.hasVehicle) extras += ' (+Parqueadero)';
+        if (item.info.guestPlayers.length > 0) {
+          const gNames = item.info.guestPlayers.map((g) => g.guestName || 'Invitado').join(', ');
+          extras += item.info.isPlaying ? ` (+Invitado: ${gNames})` : ` (Invitado: ${gNames})`;
+        }
+        
         text += `${idx + 1}. ❌ *${name}* — $${amount.toLocaleString('es-CO')} COP${extras}\n`;
       });
       text += `\n`;
@@ -352,7 +388,14 @@ export function NotificationsView({
 
     if (paid.length > 0) {
       text += `✅ *PAGOS CONFIRMADOS (${paid.length}):*\n`;
-      text += paid.map((item) => `• ${item.player?.fullName || item.att.guestName || 'Jugador'} ($${(item.info.totalPaid || item.info.totalTargetFee || basePitchFee).toLocaleString('es-CO')}) ✅`).join('\n') + `\n\n`;
+      text += paid.map((item) => {
+        let guestTag = '';
+        if (item.info.guestPlayers.length > 0 && !item.info.isPlaying) {
+          const gNames = item.info.guestPlayers.map((g) => g.guestName || 'Invitado').join(', ');
+          guestTag = ` (Invitado: ${gNames})`;
+        }
+        return `• ${item.player.fullName}${guestTag} ($${(item.info.totalPaid || item.info.totalTargetFee || basePitchFee).toLocaleString('es-CO')}) ✅`;
+      }).join('\n') + `\n\n`;
     }
 
     text += `💳 *PORTAL OFICIAL DE PAGOS & TRANSFERENCIAS:*\n`;
@@ -1099,18 +1142,9 @@ export function NotificationsView({
 
           {/* Section 2: Fast 1-Click Debtor Action List */}
           {(() => {
-            const matchAttendeesWithPayment = playingAttendances.map((att) => {
-              const p = getPlayer(att.playerId);
-              const info = getPlayerMatchBreakdown(att.playerId);
-              return {
-                att,
-                player: p,
-                info,
-              };
-            });
-
-            const unpaidAttendees = matchAttendeesWithPayment.filter((item) => !item.info.isPaid && item.player);
-            const paidAttendees = matchAttendeesWithPayment.filter((item) => item.info.isPaid && item.player);
+            const matchPayers = getMatchPayersSummary();
+            const unpaidPayers = matchPayers.filter((item) => !item.info.isPaid);
+            const paidPayers = matchPayers.filter((item) => item.info.isPaid);
 
             return (
               <Card className="border-zinc-800 bg-zinc-900/60">
@@ -1118,10 +1152,10 @@ export function NotificationsView({
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <CardTitle className="text-base flex items-center gap-2 text-white">
                       <Flame className="w-4 h-4 text-amber-400" />
-                      ⚡ Cobro Rápido a Deudores del Partido ({unpaidAttendees.length} pendientes)
+                      ⚡ Cobro Rápido a Deudores del Partido ({unpaidPayers.length} pendientes)
                     </CardTitle>
                     <div className="text-xs text-zinc-400">
-                      {paidAttendees.length} de {matchAttendeesWithPayment.length} jugadores al día
+                      {paidPayers.length} de {matchPayers.length} jugadores al día
                     </div>
                   </div>
                   <CardDescription className="text-xs text-zinc-400">
@@ -1129,7 +1163,7 @@ export function NotificationsView({
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {unpaidAttendees.length === 0 ? (
+                  {unpaidPayers.length === 0 ? (
                     <div className="p-4 bg-emerald-950/30 border border-emerald-800/40 rounded-xl flex items-center gap-3 text-emerald-200">
                       <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                       <div>
@@ -1139,8 +1173,7 @@ export function NotificationsView({
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {unpaidAttendees.map(({ att, player, info }) => {
-                        if (!player) return null;
+                      {unpaidPayers.map(({ player, info }) => {
                         const feeToPay = info.totalTargetFee > 0 ? info.totalTargetFee : basePitchFee;
                         const debt = info.pendingAmount > 0 ? info.pendingAmount : feeToPay;
                         const wasSent = sentPlayerIds.includes(player.id);
@@ -1148,7 +1181,7 @@ export function NotificationsView({
 
                         return (
                           <div
-                            key={att.id}
+                            key={player.id}
                             className={`p-3 rounded-xl border transition-all ${
                               wasSent
                                 ? 'bg-emerald-950/20 border-emerald-800/40'
@@ -1168,12 +1201,12 @@ export function NotificationsView({
                                 variant={info.isPartial ? 'warning' : 'destructive'}
                                 className="font-mono text-xs shrink-0"
                               >
-                                {info.isPartial ? `Debe $${debt.toLocaleString('es-CO')}` : `Debe $${debt.toLocaleString('es-CO')}`}
+                                Debe ${debt.toLocaleString('es-CO')}
                               </Badge>
                             </div>
 
                             <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400 mb-3 font-mono">
-                              <span>Cancha: ${info.pitchFee.toLocaleString('es-CO')}</span>
+                              {info.isPlaying && <span>Cancha: ${info.pitchFee.toLocaleString('es-CO')}</span>}
                               {info.hasVehicle && (
                                 <span className="text-cyan-400 flex items-center gap-0.5">
                                   <Car className="w-3 h-3" /> +Parq (${info.parkingFee.toLocaleString('es-CO')})
