@@ -29,7 +29,7 @@ export class SendDebtReminderUseCase {
       `🔗 *Paga o sube tu comprobante aquí:*\n` +
       `👉 https://mizpa-fc.vercel.app/pago?player=${playerId}\n\n` +
       `📱 *Nequi / Daviplata:* 312 357 8415 (Cesar Tellez)\n\n` +
-      `_Porfa ponte al día para mantener tu cupo activo en las próximas convocatorias._`;
+      `_Porfa ponte al día para poder hacer el pago de la reserva del próximo partido._`;
 
     return await this.notificationService.sendNotification({
       recipientPlayerId: playerId,

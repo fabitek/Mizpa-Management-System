@@ -377,7 +377,7 @@ export function NotificationsView({
       `🔗 *Paga o sube tu comprobante aquí:*\n` +
       `👉 ${playerPaymentLink}\n\n` +
       `📱 *Nequi / Daviplata:* 312 357 8415 (Cesar Tellez)\n\n` +
-      `_Porfa ponte al día para mantener tu cupo activo en las próximas convocatorias._`
+      `_Porfa ponte al día para poder hacer el pago de la reserva del próximo partido._`
     );
   };
 
