@@ -22,14 +22,14 @@ export class SendDebtReminderUseCase {
     }
 
     const debtAmount = Math.abs(balance);
-    const title = `⚠️ Recordatorio de Cartera Pendiente: $${debtAmount.toLocaleString('es-CO')} COP`;
+    const title = `⚠️ Estado de Cuenta: $${debtAmount.toLocaleString('es-CO')} COP`;
     const content =
-      `⚠️ *RECORDATORIO DE CUOTA PENDIENTE - MIZPA FC*\n\n` +
-      `Hola! Registramos un saldo pendiente de *$${debtAmount.toLocaleString('es-CO')} COP* por tus partidos jugados.\n\n` +
-      `💳 *Paga o reporta tu comprobante aquí:*\n` +
+      `⚠️ *ESTADO DE CUENTA • MIZPA FC* ⚽\n\n` +
+      `Hola! Registras un saldo pendiente de *$${debtAmount.toLocaleString('es-CO')} COP* de partidos anteriores.\n\n` +
+      `🔗 *Paga o sube tu comprobante aquí:*\n` +
       `👉 https://mizpa-fc.vercel.app/pago?player=${playerId}\n\n` +
-      `🟣 *Nequi / 🔴 Daviplata:* 312 357 8415 (Cesar Tellez)\n\n` +
-      `_Por favor realiza tu transferencia para mantener tu cupo activo._`;
+      `📱 *Nequi / Daviplata:* 312 357 8415 (Cesar Tellez)\n\n` +
+      `_Porfa ponte al día para mantener tu cupo activo en las próximas convocatorias._`;
 
     return await this.notificationService.sendNotification({
       recipientPlayerId: playerId,

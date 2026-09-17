@@ -298,26 +298,24 @@ export function NotificationsView({
     }
 
     const statusLine = info.isPaid
-      ? '✅ Pago al día / Confirmado'
+      ? '✅ Pago al día'
       : info.isPartial
-      ? `⚠️ Abono parcial: $${info.totalPaid.toLocaleString('es-CO')} COP (Resta por pagar $${info.pendingAmount.toLocaleString('es-CO')} COP)`
-      : `🔴 Pendiente por pagar: $${feeToPay.toLocaleString('es-CO')} COP`;
+      ? `⚠️ Abono parcial: $${info.totalPaid.toLocaleString('es-CO')} COP (Resta $${info.pendingAmount.toLocaleString('es-CO')} COP)`
+      : `🔴 Pendiente: $${feeToPay.toLocaleString('es-CO')} COP`;
 
     return (
-      `💰 *LIQUIDACIÓN DE CUOTA • MIZPA FC* ⚽\n\n` +
-      `Hola *${player.fullName}*, te compartimos el cobro oficial de tu cuota de fútbol:\n\n` +
-      `📍 *Sede:* ${currentMatch.location}${currentMatch.locationAddress ? ` (${currentMatch.locationAddress})` : ''}\n` +
+      `⚽ *CUOTA DE PARTIDO • MIZPA FC* ⚽\n\n` +
+      `Hola *${player.fullName}*, aquí tienes el resumen de tu cuota:\n\n` +
+      `📍 *Cancha:* ${currentMatch.location}${currentMatch.locationAddress ? ` (${currentMatch.locationAddress})` : ''}\n` +
       `📅 *Fecha:* ${formattedDate}\n\n` +
-      `💵 *Detalle de tu Cuota:*\n` +
+      `📋 *Detalle:*\n` +
       detailLines.join('\n') + `\n` +
-      `👉 *TOTAL A PAGAR:* $${feeToPay.toLocaleString('es-CO')} COP\n` +
+      `💵 *TOTAL A PAGAR:* $${feeToPay.toLocaleString('es-CO')} COP\n` +
       `📊 *Estado:* ${statusLine}\n\n` +
-      `💳 *PORTAL DE PAGOS & TRANSFERENCIAS:*\n` +
-      `Paga vía Nequi / Daviplata y reporta tu comprobante aquí:\n` +
+      `🔗 *Paga o sube tu comprobante aquí:*\n` +
       `👉 ${playerPaymentLink}\n\n` +
-      `🟣 *Nequi / 🔴 Daviplata:* 312 357 8415\n` +
-      `👤 *Titular:* Cesar Tellez\n\n` +
-      `_Por favor sube tu comprobante para registrar tu pago en el sistema._`
+      `📱 *Nequi / Daviplata:* 312 357 8415 (Cesar Tellez)\n\n` +
+      `_Sube el comprobante en el link para registrar tu pago de inmediato._`
     );
   };
 
@@ -374,13 +372,12 @@ export function NotificationsView({
     const playerPaymentLink = `${baseDomain.replace(/\/+$/, '')}/pago?player=${player.id}`;
 
     return (
-      `⚠️ *RECORDATORIO DE CARTERA • MIZPA FC* ⚽\n\n` +
-      `Hola *${player.fullName}*, te recordamos que tienes un saldo pendiente acumulado de *$${totalDebt.toLocaleString('es-CO')} COP* por concepto de partidos de fútbol.\n\n` +
-      `💳 *Paga o reporta tu comprobante aquí:*\n` +
+      `⚠️ *ESTADO DE CUENTA • MIZPA FC* ⚽\n\n` +
+      `Hola *${player.fullName}*, registras un saldo pendiente de *$${totalDebt.toLocaleString('es-CO')} COP* de partidos anteriores.\n\n` +
+      `🔗 *Paga o sube tu comprobante aquí:*\n` +
       `👉 ${playerPaymentLink}\n\n` +
-      `🟣 *Nequi / 🔴 Daviplata:* 312 357 8415\n` +
-      `👤 *Titular:* Cesar Tellez\n\n` +
-      `_Agradecemos tu pago oportuno para mantener tu cupo activo en las próximas convocatorias._`
+      `📱 *Nequi / Daviplata:* 312 357 8415 (Cesar Tellez)\n\n` +
+      `_Porfa ponte al día para mantener tu cupo activo en las próximas convocatorias._`
     );
   };
 

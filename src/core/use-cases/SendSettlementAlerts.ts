@@ -48,15 +48,15 @@ export class SendSettlementAlertsUseCase {
       const balance = await this.financeRepository.getPlayerBalance(payerId);
       const isSolvent = balance >= 0;
 
-      const title = `💰 Liquidación Cuota: $${match.settledFeePerPlayer.toLocaleString('es-CO')} COP`;
+      const title = `⚽ Cuota de Partido: $${match.settledFeePerPlayer.toLocaleString('es-CO')} COP`;
       const content =
-        `💰 *LIQUIDACIÓN DE PARTIDO - MIZPA FC*\n\n` +
+        `⚽ *CUOTA DE PARTIDO • MIZPA FC* ⚽\n\n` +
         `📍 *Cancha:* ${match.location}\n` +
-        `💵 *Cuota Congelada:* $${match.settledFeePerPlayer.toLocaleString('es-CO')} COP\n` +
-        `📊 *Tu Saldo en Billetera:* $${balance.toLocaleString('es-CO')} COP (${isSolvent ? 'Al día ✅' : 'Saldo pendiente ⚠️'})\n\n` +
-        `💳 *Paga o reporta tu comprobante aquí:*\n` +
+        `💵 *Cuota:* $${match.settledFeePerPlayer.toLocaleString('es-CO')} COP\n` +
+        `📊 *Saldo en Billetera:* $${balance.toLocaleString('es-CO')} COP (${isSolvent ? '✅ Al día' : '🔴 Pendiente'})\n\n` +
+        `🔗 *Paga o sube tu comprobante aquí:*\n` +
         `👉 https://mizpa-fc.vercel.app/pago?player=${payerId}\n\n` +
-        `🟣 *Nequi / 🔴 Daviplata:* 312 357 8415 (Cesar Tellez)`;
+        `📱 *Nequi / Daviplata:* 312 357 8415 (Cesar Tellez)`;
 
       const notif = await this.notificationService.sendNotification({
         recipientPlayerId: payerId,
