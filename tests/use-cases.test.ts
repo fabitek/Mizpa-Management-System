@@ -352,6 +352,52 @@ describe('SettleMatch Use Case', () => {
       }
     );
   });
+
+  it('should throw MatchAlreadySettledError if debits already exist for the match', async () => {
+    const matchId = 'match-idempotency-test';
+    await matchRepo.save({
+      id: matchId,
+      location: 'Test Location',
+      date: new Date('2026-09-01T20:00:00Z'),
+      pitchRentalCost: 100,
+      extraCosts: 0,
+      durationHours: 2,
+      parkingFeePerHour: 1000,
+      maxPlayers: 18,
+      settledFeePerPlayer: null,
+      status: 'OPEN_REGISTRATION',
+      mvpPlayerId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await attendanceRepo.save({
+      id: 'att-idem-1',
+      matchId,
+      playerId: 'player-idem-1',
+      status: 'ATTENDED',
+      registeredAt: new Date(),
+    });
+
+    // Record existing debit manually
+    await financeRepo.recordEntry({
+      id: 'existing-debit-1',
+      matchId,
+      playerId: 'player-idem-1',
+      type: 'DEBIT',
+      amount: 50,
+      referenceDate: new Date(),
+      createdAt: new Date(),
+    });
+
+    await assert.rejects(
+      async () => await settleMatch.execute({ matchId }),
+      (err: Error) => {
+        assert.ok(err instanceof MatchAlreadySettledError);
+        return true;
+      }
+    );
+  });
 });
 
 describe('InMemoryFinanceRepository - Balance Calculations', () => {

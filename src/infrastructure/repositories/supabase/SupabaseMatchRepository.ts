@@ -15,7 +15,6 @@ interface MatchRow {
   settled_fee_per_player: number | string | null;
   status: string;
   mvp_player_id?: string | null;
-  notification_sent_10_players?: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -59,7 +58,7 @@ export class SupabaseMatchRepository implements IMatchRepository {
           : null,
       status: row.status as MatchStatus,
       mvpPlayerId: row.mvp_player_id ?? null,
-      notificationSent10Players: Boolean(row.notification_sent_10_players),
+      notificationSent10Players: false,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     };
@@ -82,7 +81,6 @@ export class SupabaseMatchRepository implements IMatchRepository {
       settled_fee_per_player: match.settledFeePerPlayer,
       status: match.status,
       mvp_player_id: optionalUUID(match.mvpPlayerId),
-      notification_sent_10_players: Boolean(match.notificationSent10Players),
       created_at: match.createdAt.toISOString(),
       updated_at: match.updatedAt.toISOString(),
     };
@@ -149,10 +147,12 @@ export class SupabaseMatchRepository implements IMatchRepository {
         .eq('id', match.id);
 
       if (error) {
-        console.warn(`Supabase update match warning '${match.id}': ${error.message}`);
+        console.error(`Supabase update match error '${match.id}': ${error.message}`);
+        throw new Error(`Failed to update match '${match.id}': ${error.message}`);
       }
     } catch (err: any) {
-      console.warn(`Supabase update exception '${match.id}', preserved in cache:`, err.message);
+      console.error(`Supabase update exception '${match.id}':`, err.message);
+      throw err;
     }
   }
 

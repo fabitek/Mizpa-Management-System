@@ -136,6 +136,10 @@ export function MatchSettlementCard({
   // Delete Match State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
 
+  // Settle Confirmation Modal & Double-Click Lock State
+  const [showSettleConfirmModal, setShowSettleConfirmModal] = useState<boolean>(false);
+  const [isSettling, setIsSettling] = useState<boolean>(false);
+
   // State for adding a guest (+1)
   const [selectedHostPlayerId, setSelectedHostPlayerId] = useState<string>(players[0]?.id || '');
   const [guestName, setGuestName] = useState<string>('');
@@ -191,6 +195,7 @@ export function MatchSettlementCard({
       setFeedback(null);
       setShowDeleteConfirm(false);
       setShowEditModal(false);
+      setShowSettleConfirmModal(false);
     }
   };
 
@@ -329,21 +334,34 @@ export function MatchSettlementCard({
   };
 
   const handleSettle = () => {
-    if (!match) return;
+    if (!match || isSettling || isPending || isSettled) return;
+    setIsSettling(true);
     startTransition(async () => {
-      const res = await settleMatchAction(match.id);
-      setFeedback(res);
-      if (res.success && res.data) {
-        setMatch((prev) =>
-          prev
-            ? {
-                ...prev,
-                status: 'SETTLED',
-                settledFeePerPlayer: res.data!.settledFeePerPlayer,
-                updatedAt: new Date(res.data!.updatedAt),
-              }
-            : null
-        );
+      try {
+        const res = await settleMatchAction(match.id);
+        setFeedback(res);
+        if (res.success && res.data) {
+          const updatedMatch: Match = {
+            ...match,
+            status: 'SETTLED',
+            settledFeePerPlayer: res.data.settledFeePerPlayer,
+            updatedAt: new Date(res.data.updatedAt),
+          };
+          setMatch(updatedMatch);
+          setMatches((prev) => prev.map((m) => (m.id === updatedMatch.id ? updatedMatch : m)));
+          setShowSettleConfirmModal(false);
+        } else if (res.errorCode === 'MATCH_ALREADY_SETTLED') {
+          const updatedMatch: Match = {
+            ...match,
+            status: 'SETTLED',
+            updatedAt: new Date(),
+          };
+          setMatch(updatedMatch);
+          setMatches((prev) => prev.map((m) => (m.id === updatedMatch.id ? updatedMatch : m)));
+          setShowSettleConfirmModal(false);
+        }
+      } finally {
+        setIsSettling(false);
       }
     });
   };
@@ -808,13 +826,13 @@ export function MatchSettlementCard({
               </Link>
 
               <Button
-                onClick={handleSettle}
-                disabled={isSettled || isPending || attendedCount === 0}
+                onClick={() => setShowSettleConfirmModal(true)}
+                disabled={isSettled || isPending || isSettling || attendedCount === 0}
                 variant={isSettled ? 'secondary' : 'default'}
                 size="default"
                 className="font-medium text-xs sm:text-sm transition-all"
               >
-                {isPending ? (
+                {isSettling || isPending ? (
                   <span className="flex items-center gap-1.5">
                     <span className="animate-spin">⏳</span> Liquidando...
                   </span>
@@ -1196,6 +1214,83 @@ export function MatchSettlementCard({
                 </Button>
               </div>
             </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Confirmation Dialog / Card para Liquidar Partido */}
+      {showSettleConfirmModal && match && (
+        <Card className="border-emerald-600/50 bg-gradient-to-b from-emerald-950/40 to-zinc-950 shadow-2xl animate-in fade-in duration-200">
+          <CardHeader className="pb-3 border-b border-zinc-800 flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2 text-emerald-400">
+              <DollarSign className="w-5 h-5" />
+              <CardTitle className="text-base font-bold text-emerald-200">
+                ¿Liquidar este partido y congelar cuotas?
+              </CardTitle>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSettleConfirmModal(false)}
+              disabled={isSettling || isPending}
+              className="text-zinc-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4">
+            <div className="space-y-2 text-sm text-zinc-300">
+              <p>
+                Estás a punto de liquidar oficialmente el partido en <strong className="text-white">{match.location}</strong>.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-zinc-900/80 p-3 rounded-xl border border-zinc-800 text-xs">
+                <div>
+                  <span className="text-zinc-400 block">Jugadores Asistentes:</span>
+                  <strong className="text-white font-mono text-sm">{attendedCount} jugadores</strong>
+                </div>
+                <div>
+                  <span className="text-zinc-400 block">Cuota por Jugador:</span>
+                  <strong className="text-emerald-400 font-mono text-sm">${basePitchFee.toLocaleString('es-CO')} COP</strong>
+                </div>
+                <div>
+                  <span className="text-zinc-400 block">Costo Cancha:</span>
+                  <strong className="text-zinc-200 font-mono text-sm">${match.pitchRentalCost.toLocaleString('es-CO')} COP</strong>
+                </div>
+              </div>
+              <p className="text-xs text-amber-400/90 flex items-start gap-1.5">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+                <span>
+                  Esta acción registrará los asientos de <strong>DÉBITO</strong> en el libro mayor contable para los asistentes y congelará el estado del partido como <strong>SETTLED</strong>.
+                </span>
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSettleConfirmModal(false)}
+                disabled={isSettling || isPending}
+                className="text-zinc-400"
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSettle}
+                disabled={isSettling || isPending || isSettled || attendedCount === 0}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-2 shadow-lg"
+              >
+                {isSettling || isPending ? (
+                  <>
+                    <span className="animate-spin">⏳</span> Liquidando y Guardando...
+                  </>
+                ) : (
+                  <>
+                    <DollarSign className="w-4 h-4" /> Sí, Liquidar Partido (Definitivo)
+                  </>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -2000,13 +2095,13 @@ export function MatchSettlementCard({
                     </p>
                   </div>
                   <Button
-                    onClick={handleSettle}
-                    disabled={isSettled || isPending || attendedCount === 0}
+                    onClick={() => setShowSettleConfirmModal(true)}
+                    disabled={isSettled || isPending || isSettling || attendedCount === 0}
                     variant={isSettled ? 'secondary' : 'default'}
                     size="sm"
                     className="font-bold text-xs"
                   >
-                    {isPending ? 'Liquidando...' : isSettled ? '✓ Partido Liquidado' : 'Liquidar Partido'}
+                    {isSettling || isPending ? 'Liquidando...' : isSettled ? '✓ Partido Liquidado' : 'Liquidar Partido'}
                   </Button>
                 </div>
 

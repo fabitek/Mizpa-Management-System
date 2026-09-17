@@ -56,6 +56,21 @@ export class SettleMatchUseCase {
       );
     }
 
+    // 2.1. Idempotencia contable: comprobar si ya existen asientos DEBIT para este partido
+    const existingEntries = await this.financeRepository.getEntriesByMatchId(matchId);
+    const hasExistingDebits = existingEntries.some((e) => e.type === 'DEBIT');
+    if (hasExistingDebits) {
+      const updatedMatch: Match = {
+        ...match,
+        status: 'SETTLED',
+        updatedAt: new Date(),
+      };
+      await this.matchRepository.update(updatedMatch);
+      throw new MatchAlreadySettledError(
+        `El partido '${matchId}' ya fue liquidado previamente y cuenta con débitos registrados en el libro contable.`
+      );
+    }
+
     // 3. Carga las asistencias del partido y filtra por jugadores con status 'ATTENDED' (excluye acompañantes que no juegan)
     const attendances = await this.attendanceRepository.findByMatchId(matchId);
     const attendees = attendances.filter(

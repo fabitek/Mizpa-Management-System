@@ -507,17 +507,15 @@ export function PlayerWalletView({
                                 {isCredit ? '+' : '-'}${entry.amount.toLocaleString('es-CO')}
                               </TableCell>
                               <TableCell className="text-right">
-                                {isCredit && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteEntry(entry.id)}
-                                    disabled={isPending}
-                                    className="text-zinc-500 hover:text-red-400 p-1 rounded transition-colors"
-                                    title="Anular / Eliminar abono erróneo"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5 inline" />
-                                  </button>
-                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteEntry(entry.id)}
+                                  disabled={isPending}
+                                  className="text-zinc-500 hover:text-red-400 p-1 rounded transition-colors"
+                                  title={isCredit ? "Anular / Eliminar abono erróneo" : "Anular / Eliminar débito erróneo"}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 inline" />
+                                </button>
                               </TableCell>
                             </TableRow>
                           );
