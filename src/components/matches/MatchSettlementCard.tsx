@@ -474,9 +474,9 @@ export function MatchSettlementCard({
   };
 
   const getPlayerPaymentDetails = (playerId: string, playerFee: number) => {
-    // Include all CREDIT entries for this player (cash, transfer, Nequi, etc.)
+    // Include only CREDIT entries explicitly registered for this specific match
     const playerCredits = financialEntries.filter(
-      (e) => e.type === 'CREDIT' && e.playerId === playerId
+      (e) => e.type === 'CREDIT' && e.matchId === match?.id && e.playerId === playerId
     );
     const totalPaid = playerCredits.reduce((sum, e) => sum + e.amount, 0);
     const isPaid = playerFee > 0 ? totalPaid >= playerFee : totalPaid > 0;
@@ -503,10 +503,7 @@ export function MatchSettlementCard({
   }, 0);
 
   const matchFinancialCredits = financialEntries.filter(
-    (e) =>
-      e.type === 'CREDIT' &&
-      (e.matchId === match?.id ||
-        playingAttendances.some((att) => att.playerId === e.playerId))
+    (e) => e.type === 'CREDIT' && e.matchId === match?.id
   );
 
   const totalCollected = matchFinancialCredits.reduce((acc, e) => acc + e.amount, 0);

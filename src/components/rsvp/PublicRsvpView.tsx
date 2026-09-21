@@ -600,7 +600,8 @@ export function PublicRsvpView({
           pid,
           paymentAmount,
           paymentNote.trim() || `Abono partido - ${match.location}`,
-          paymentReceiptUrl || undefined
+          paymentReceiptUrl || undefined,
+          match.id
         );
         if (res.success) {
           setPaymentSuccess(true);

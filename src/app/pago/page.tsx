@@ -23,6 +23,7 @@ export default async function PagoPage({
   const players = await getAllPlayersAction();
 
   let defaultMatchFee = 8500;
+  let activeMatchId: string | undefined = undefined;
 
   try {
     const allMatches = await matchRepository.findAll();
@@ -32,6 +33,7 @@ export default async function PagoPage({
     const activeMatch = sortedMatches.find((m) => m.status === 'OPEN_REGISTRATION' || m.status === 'DRAFT') || sortedMatches[0];
 
     if (activeMatch) {
+      activeMatchId = activeMatch.id;
       if (activeMatch.settledFeePerPlayer) {
         defaultMatchFee = activeMatch.settledFeePerPlayer;
       } else {
@@ -57,6 +59,7 @@ export default async function PagoPage({
         players={players}
         defaultPlayerId={defaultPlayerId}
         defaultMatchFee={defaultMatchFee}
+        activeMatchId={activeMatchId}
       />
     </div>
   );

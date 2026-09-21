@@ -213,14 +213,18 @@ export function NotificationsView({
 
     const totalTargetFee = pitchFee + parkingFee + guestsFee;
 
-    // Credits for this player (all payments)
-    const playerCredits = financialEntries.filter((e) => e.type === 'CREDIT' && e.playerId === playerId);
-    const totalPaid = playerCredits.reduce((s, e) => s + e.amount, 0);
+    // Credits for this player specifically in this match
+    const matchCredits = financialEntries.filter(
+      (e) => e.type === 'CREDIT' && e.playerId === playerId && e.matchId === currentMatch?.id
+    );
+    const totalPaid = matchCredits.reduce((s, e) => s + e.amount, 0);
 
-    // Debits for this player (all debts)
-    const playerDebits = financialEntries.filter((e) => e.type === 'DEBIT' && e.playerId === playerId);
-    const totalDebits = playerDebits.reduce((s, e) => s + e.amount, 0);
-    const walletBalance = totalPaid - totalDebits;
+    // Debits and Credits across all time for overall wallet balance
+    const allPlayerCredits = financialEntries.filter((e) => e.type === 'CREDIT' && e.playerId === playerId);
+    const allPlayerDebits = financialEntries.filter((e) => e.type === 'DEBIT' && e.playerId === playerId);
+    const totalAllPaid = allPlayerCredits.reduce((s, e) => s + e.amount, 0);
+    const totalAllDebits = allPlayerDebits.reduce((s, e) => s + e.amount, 0);
+    const walletBalance = totalAllPaid - totalAllDebits;
 
     const isPaid = totalTargetFee > 0 ? totalPaid >= totalTargetFee : (isAttending || guestPlayers.length > 0 ? totalPaid > 0 : true);
     const isPartial = totalPaid > 0 && totalPaid < totalTargetFee;

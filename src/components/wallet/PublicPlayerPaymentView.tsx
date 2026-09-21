@@ -31,6 +31,7 @@ interface PublicPlayerPaymentViewProps {
   players: Player[];
   defaultPlayerId?: string;
   defaultMatchFee?: number;
+  activeMatchId?: string;
 }
 
 const CLUB_PAYMENT_CHANNELS = [
@@ -68,13 +69,14 @@ export function PublicPlayerPaymentView({
   players,
   defaultPlayerId = '',
   defaultMatchFee = 8500,
+  activeMatchId,
 }: PublicPlayerPaymentViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(
     players.find((p) => p.id === defaultPlayerId) || null
   );
 
-  const [amount, setAmount] = useState<number | ''>(defaultMatchFee || 8500);
+  const [amount, setAmount] = useState<number | ''>(defaultMatchFee);
   const [note, setNote] = useState<string>('Abono cuota fútbol');
   const [receiptUrl, setReceiptUrl] = useState<string>('');
   const [ocrData, setOcrData] = useState<ReceiptOcrResult | null>(null);
@@ -114,10 +116,8 @@ export function PublicPlayerPaymentView({
     setReceiptUrl(data.receiptUrl);
     if (data.ocrResult) {
       setOcrData(data.ocrResult);
-      if (data.ocrResult.amount && data.ocrResult.amount > 0) {
-        setAmount(data.ocrResult.amount);
-      }
-    } else if (data.suggestedAmount && data.suggestedAmount > 0) {
+    }
+    if (data.suggestedAmount && data.suggestedAmount > 0) {
       setAmount(data.suggestedAmount);
     }
     if (data.suggestedNote) {
@@ -144,7 +144,8 @@ export function PublicPlayerPaymentView({
           selectedPlayer.id,
           finalAmount,
           note.trim() || 'Abono por transferencia',
-          receiptUrl || undefined
+          receiptUrl || undefined,
+          activeMatchId || undefined
         );
 
         if (res.success && res.data) {
