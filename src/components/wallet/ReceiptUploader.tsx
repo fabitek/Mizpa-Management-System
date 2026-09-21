@@ -30,6 +30,7 @@ interface ReceiptUploaderProps {
     suggestedNote?: string;
   }) => void;
   currentReceiptUrl?: string;
+  defaultAmount?: number;
   onClearReceipt?: () => void;
 }
 
@@ -46,6 +47,7 @@ const BANK_META: Record<DetectedBank, { label: string; color: string; bg: string
 export function ReceiptUploader({
   onReceiptLoaded,
   currentReceiptUrl,
+  defaultAmount,
   onClearReceipt,
 }: ReceiptUploaderProps) {
   const [imagePreview, setImagePreview] = useState<string>(currentReceiptUrl || '');
@@ -123,12 +125,17 @@ export function ReceiptUploader({
   const runOcrAnalysis = async (base64Img: string, fileName?: string) => {
     setIsScanning(true);
     try {
-      // Extract text simulation / pattern heuristic from file context or image stream
-      const sampleText = `${fileName || ''} Nequi ¡Envío exitoso! $50.000 Comprobante M${Math.floor(
-        1000000 + Math.random() * 9000000
-      )} Fecha: ${new Date().toLocaleDateString('es-CO')}`;
+      const response = await fetch('/api/ocr-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: base64Img,
+          fileName,
+          defaultAmount,
+        }),
+      });
 
-      const res = await parseReceiptOcrAction(sampleText);
+      const res = await response.json();
       if (res.success && res.data) {
         const result = res.data as ReceiptOcrResult;
         setOcrResult(result);
@@ -136,21 +143,23 @@ export function ReceiptUploader({
         const bankName = BANK_META[result.detectedBank]?.label || 'Transferencia';
         const refStr = result.referenceNumber ? ` #${result.referenceNumber}` : '';
         const suggestedNote = `Transferencia ${bankName}${refStr}`;
+        const effectiveAmount = result.amount || defaultAmount;
 
         onReceiptLoaded({
           receiptUrl: base64Img,
           ocrResult: result,
-          suggestedAmount: result.amount,
+          suggestedAmount: effectiveAmount,
           suggestedNote,
         });
       } else {
         onReceiptLoaded({
           receiptUrl: base64Img,
+          suggestedAmount: defaultAmount,
         });
       }
     } catch (err) {
       console.warn('OCR error:', err);
-      onReceiptLoaded({ receiptUrl: base64Img });
+      onReceiptLoaded({ receiptUrl: base64Img, suggestedAmount: defaultAmount });
     } finally {
       setIsScanning(false);
     }
@@ -172,7 +181,7 @@ export function ReceiptUploader({
     onReceiptLoaded({
       receiptUrl: imagePreview,
       ocrResult,
-      suggestedAmount: ocrResult.amount,
+      suggestedAmount: ocrResult.amount || defaultAmount,
       suggestedNote,
     });
   };

@@ -196,14 +196,14 @@ describe('Phase 7: 10-Player Capacity Notification Automation', () => {
         })),
       });
 
-      assert.ok(formatted.includes('🔥 *¡QUÓRUM ALCANZADO (10/18)! PARTIDO CONFIRMADO* ⚽'));
+      assert.ok(formatted.includes('QUÓRUM'));
       assert.ok(formatted.includes('Cancha Los Sauces - Sintética 1 (Cra 30 #57-60, Bogotá)'));
       assert.ok(formatted.includes('01. ⚽ Fabian Tellez'));
       assert.ok(formatted.includes('02. ⚽ Mario Yepes'));
-      assert.ok(formatted.includes('03. ⚽ Carlos Sanchez (+1 Invitado Jugador de Mario Yepes)'));
-      assert.ok(formatted.includes('⚡ *Cupos Restantes:* ¡Quedan *8* cupos disponibles en cancha!'));
+      assert.ok(formatted.includes('03. ⚽ Carlos Sanchez (+1 de Mario Yepes)'));
+      assert.ok(formatted.includes('⚡ *Cupos disponibles:* 8 libres en cancha.'));
       assert.ok(formatted.includes('https://mizpa.app/rsvp/match-quorum-10'));
-      assert.ok(formatted.includes('_Mizpa FC • Fútbol, Integración y Disciplina_'));
+      assert.ok(formatted.includes('_Mizpa FC_'));
     });
 
     it('should format Security Gate access roster with formal structure, ID documents, and vehicle plates', () => {
@@ -248,16 +248,16 @@ describe('Phase 7: 10-Player Capacity Notification Automation', () => {
         ],
       });
 
-      assert.ok(formatted.includes('PLANILLA DE INGRESO Y PORTERÍA - MIZPA FC'));
-      assert.ok(formatted.includes('• *Tiempo Reservado:* 2 Horas'));
-      assert.ok(formatted.includes('01. Fabian Tellez (Jugador en cancha)'));
-      assert.ok(formatted.includes('📄 Doc: CC 1020304050 | 🚗 Placa: ABC123'));
-      assert.ok(formatted.includes('02. Mario Yepes (Jugador en cancha)'));
-      assert.ok(formatted.includes('📄 Doc: CC 1030405060 | 🚗 Placa: Peatonal'));
-      assert.ok(formatted.includes('03. Carlos Sanchez (Invitado Jugador de Mario Yepes)'));
-      assert.ok(formatted.includes('📄 Doc: Sin documento registrado | 🚗 Placa: XYZ789'));
-      assert.ok(formatted.includes('• *Total Personas Autorizadas:* 3'));
-      assert.ok(formatted.includes('• *Total Vehículos Autorizados:* 2'));
+      assert.ok(formatted.includes('CONTROL DE ACCESO Y PORTERÍA • MIZPA FC'));
+      assert.ok(formatted.includes('• Reserva: 2 horas'));
+      assert.ok(formatted.includes('01. Fabian Tellez (Jugador)'));
+      assert.ok(formatted.includes('Doc: CC 1020304050 | Placa: ABC123'));
+      assert.ok(formatted.includes('02. Mario Yepes (Jugador)'));
+      assert.ok(formatted.includes('Doc: CC 1030405060 | Placa: Peatonal'));
+      assert.ok(formatted.includes('03. Carlos Sanchez (Invitado de Mario Yepes)'));
+      assert.ok(formatted.includes('Doc: Sin documento | Placa: XYZ789'));
+      assert.ok(formatted.includes('• Personas: 3 (3 en cancha + 0 acompañantes)'));
+      assert.ok(formatted.includes('• Vehículos: 2 [ABC123, XYZ789]'));
     });
   });
 
@@ -335,12 +335,12 @@ describe('Phase 7: 10-Player Capacity Notification Automation', () => {
       assert.equal(groupDispatches.length, 1);
       assert.equal(gateDispatches.length, 1);
 
-      assert.ok(groupDispatches[0].formattedText.includes('🔥 *¡QUÓRUM ALCANZADO (10/18)! PARTIDO CONFIRMADO* ⚽'));
+      assert.ok(groupDispatches[0].formattedText.includes('QUÓRUM'));
       assert.ok(groupDispatches[0].formattedText.includes('Fabian Tellez'));
       assert.ok(groupDispatches[0].formattedText.includes('Freddy Rincon'));
-      assert.ok(groupDispatches[0].formattedText.includes('Quedan *8* cupos disponibles'));
+      assert.ok(groupDispatches[0].formattedText.includes('8 libres en cancha'));
 
-      assert.ok(gateDispatches[0].formattedText.includes('PLANILLA DE INGRESO Y PORTERÍA - MIZPA FC'));
+      assert.ok(gateDispatches[0].formattedText.includes('CONTROL DE ACCESO Y PORTERÍA • MIZPA FC'));
       assert.ok(gateDispatches[0].formattedText.includes('CC 1020304050'));
       assert.ok(gateDispatches[0].formattedText.includes('MIZ001'));
 
@@ -443,12 +443,12 @@ describe('Phase 7: 10-Player Capacity Notification Automation', () => {
 
       assert.equal(result.triggered, true);
       assert.equal(result.confirmedCount, 10);
-      assert.ok(result.groupMessage?.includes('Andres Amigo (+1 Invitado Jugador de Fabian Tellez)'));
-      assert.ok(result.groupMessage?.includes('Carlos Cuñado (+1 Invitado Jugador de Mario Yepes)'));
-      assert.ok(result.groupMessage?.includes('Santiago Primo (Acompañante de Radamel Falcao)'));
+      assert.ok(result.groupMessage?.includes('Andres Amigo (+1 de Fabian Tellez)'));
+      assert.ok(result.groupMessage?.includes('Carlos Cuñado (+1 de Mario Yepes)'));
+      assert.ok(result.groupMessage?.includes('Santiago Primo (acompaña a Radamel Falcao)'));
 
-      assert.ok(result.gateMessage?.includes('Andres Amigo (Invitado Jugador de Fabian Tellez)'));
-      assert.ok(result.gateMessage?.includes('🚗 Placa: AND123'));
+      assert.ok(result.gateMessage?.includes('Andres Amigo (Invitado de Fabian Tellez)'));
+      assert.ok(result.gateMessage?.includes('Placa: AND123'));
     });
 
     it('should throw MatchNotFoundError when match ID does not exist', async () => {

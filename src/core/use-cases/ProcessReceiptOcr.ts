@@ -71,11 +71,11 @@ export class ProcessReceiptOcrUseCase {
     let amount: number | undefined = undefined;
     let amountConfidence = 0;
 
-    // Matches: $ 50.000,00 | $50.000 | 50.000 COP | $ 120,000 | $ 25 000
+    // Matches: $ 8.500,00 | $8.500 | $ 8,500.00 | $ 50.000 | 8.500 COP | $ 120,000 | $ 25000
     const amountRegexes = [
-      /\$\s*([0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]{2})?)/i,
-      /\$\s*([0-9]{1,3}(?:,[0-9]{3})+(?:\.[0-9]{2})?)/i,
-      /(?:valor|monto|total|cuánto|cuanto|enviaste|enviado)[\s:]+\$?\s*([0-9]{1,3}(?:\.[0-9]{3})+)/i,
+      /(?:cuánto|cuanto|valor|monto|total|enviaste|enviado|transferido|pagado|pagaste)[\s:?]+\$?\s*([0-9]{1,3}(?:[.,][0-9]{3})+(?:[.,][0-9]{2})?)/i,
+      /\$\s*([0-9]{1,3}(?:[.,][0-9]{3})+(?:[.,][0-9]{2})?)/i,
+      /(?:cuánto|cuanto|valor|monto|total|enviaste|enviado|transferido)[\s:?]+\$?\s*([0-9]{4,7})/i,
       /\$\s*([0-9]{4,7})/i,
       /(?:^|\s)([1-9][0-9]{0,2}(?:\.[0-9]{3})+)\s*(?:cop|pesos)?/i,
     ];
@@ -83,13 +83,15 @@ export class ProcessReceiptOcrUseCase {
     for (const regex of amountRegexes) {
       const match = cleanText.match(regex);
       if (match && match[1]) {
-        // Clean formatting: remove periods and commas for decimals
-        let numStr = match[1].replace(/\./g, '').replace(/,/g, '');
-        // If it ended with 00 cents, remove if > 100k
+        let rawVal = match[1].trim();
+        // Remove trailing decimal cents like ,00 or .00
+        rawVal = rawVal.replace(/[,.]00$/, '');
+        // Remove thousands separators (periods, commas, spaces)
+        const numStr = rawVal.replace(/[.,\s]/g, '');
         const parsed = parseInt(numStr, 10);
         if (!isNaN(parsed) && parsed >= 1000 && parsed <= 50000000) {
           amount = parsed;
-          amountConfidence = 0.9;
+          amountConfidence = 0.95;
           break;
         }
       }
@@ -98,10 +100,10 @@ export class ProcessReceiptOcrUseCase {
     // 3. Extract Reference / Authorization Number
     let referenceNumber: string | undefined = undefined;
 
-    // Nequi reference pattern: M12345678 or M followed by 6-9 digits
-    const nequiRefMatch = cleanText.match(/\b([M|C][0-9]{6,10})\b/i);
+    // Nequi reference pattern: M12345678 or M followed by 6-9 digits, or M 1234567
+    const nequiRefMatch = cleanText.match(/\b([M|C]\s*[0-9]{6,10})\b/i);
     if (nequiRefMatch) {
-      referenceNumber = nequiRefMatch[1].toUpperCase();
+      referenceNumber = nequiRefMatch[1].replace(/\s+/g, '').toUpperCase();
     } else {
       const genericRefMatches = [
         /(?:referencia|comprobante|autorización|autorizacion|código|codigo|transacción|transaccion|no\.)[\s:#.-]+([A-Z0-9]{5,15})/i,

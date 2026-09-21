@@ -172,7 +172,7 @@ describe('Pure Core Domain - Semantic Exceptions', () => {
     assert.ok(defaultErr instanceof Error);
     assert.ok(defaultErr instanceof MatchAlreadySettledError);
     assert.equal(defaultErr.name, 'MatchAlreadySettledError');
-    assert.equal(defaultErr.message, 'Match is already settled.');
+    assert.equal(defaultErr.message, 'Partido ya liquidado.');
 
     const customErr = new MatchAlreadySettledError('Cannot modify match M-1: already settled.');
     assert.equal(customErr.message, 'Cannot modify match M-1: already settled.');
@@ -183,7 +183,7 @@ describe('Pure Core Domain - Semantic Exceptions', () => {
     assert.ok(defaultErr instanceof Error);
     assert.ok(defaultErr instanceof MaxCapacityReachedError);
     assert.equal(defaultErr.name, 'MaxCapacityReachedError');
-    assert.equal(defaultErr.message, 'Maximum match capacity reached.');
+    assert.equal(defaultErr.message, 'Cupos agotados en cancha.');
 
     const customErr = new MaxCapacityReachedError('Match capacity of 10 reached.');
     assert.equal(customErr.message, 'Match capacity of 10 reached.');
@@ -194,7 +194,7 @@ describe('Pure Core Domain - Semantic Exceptions', () => {
     assert.ok(defaultErr instanceof Error);
     assert.ok(defaultErr instanceof InvalidAttendanceStateError);
     assert.equal(defaultErr.name, 'InvalidAttendanceStateError');
-    assert.equal(defaultErr.message, 'Invalid attendance state transition.');
+    assert.equal(defaultErr.message, 'Cambio de estado no permitido.');
 
     const customErr = new InvalidAttendanceStateError('Cannot transition from CANCELLED to ATTENDED.');
     assert.equal(customErr.message, 'Cannot transition from CANCELLED to ATTENDED.');
@@ -205,7 +205,7 @@ describe('Pure Core Domain - Semantic Exceptions', () => {
     assert.ok(defaultErr instanceof Error);
     assert.ok(defaultErr instanceof InvalidFinancialAmountError);
     assert.equal(defaultErr.name, 'InvalidFinancialAmountError');
-    assert.equal(defaultErr.message, 'Invalid financial amount.');
+    assert.equal(defaultErr.message, 'Monto inválido.');
 
     const customErr = new InvalidFinancialAmountError('Amount cannot be negative or zero.');
     assert.equal(customErr.message, 'Amount cannot be negative or zero.');

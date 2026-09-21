@@ -30,6 +30,7 @@ import {
 interface PublicPlayerPaymentViewProps {
   players: Player[];
   defaultPlayerId?: string;
+  defaultMatchFee?: number;
 }
 
 const CLUB_PAYMENT_CHANNELS = [
@@ -66,13 +67,14 @@ const CLUB_PAYMENT_CHANNELS = [
 export function PublicPlayerPaymentView({
   players,
   defaultPlayerId = '',
+  defaultMatchFee = 8500,
 }: PublicPlayerPaymentViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(
     players.find((p) => p.id === defaultPlayerId) || null
   );
 
-  const [amount, setAmount] = useState<number | ''>(8500);
+  const [amount, setAmount] = useState<number | ''>(defaultMatchFee || 8500);
   const [note, setNote] = useState<string>('Abono cuota fútbol');
   const [receiptUrl, setReceiptUrl] = useState<string>('');
   const [ocrData, setOcrData] = useState<ReceiptOcrResult | null>(null);
@@ -112,8 +114,12 @@ export function PublicPlayerPaymentView({
     setReceiptUrl(data.receiptUrl);
     if (data.ocrResult) {
       setOcrData(data.ocrResult);
+      if (data.ocrResult.amount && data.ocrResult.amount > 0) {
+        setAmount(data.ocrResult.amount);
+      }
+    } else if (data.suggestedAmount && data.suggestedAmount > 0) {
+      setAmount(data.suggestedAmount);
     }
-    // Amount is now locked to 8500, ignore OCR suggested amount
     if (data.suggestedNote) {
       setNote(data.suggestedNote);
     }
@@ -126,10 +132,9 @@ export function PublicPlayerPaymentView({
       return;
     }
     
-    // Strict validation: Only allow 8500
-    const finalAmount = 8500;
-    if (Number(amount) !== 8500) {
-      setFeedback({ success: false, message: 'El abono fijado es de $8.500 COP.' });
+    const finalAmount = Number(amount);
+    if (!finalAmount || finalAmount <= 0) {
+      setFeedback({ success: false, message: 'Ingresa un monto válido superior a $0 COP.' });
       return;
     }
 
@@ -421,6 +426,7 @@ export function PublicPlayerPaymentView({
             <ReceiptUploader
               onReceiptLoaded={handleReceiptLoaded}
               currentReceiptUrl={receiptUrl}
+              defaultAmount={typeof amount === 'number' ? amount : defaultMatchFee}
               onClearReceipt={() => {
                 setReceiptUrl('');
                 setOcrData(null);
@@ -430,10 +436,18 @@ export function PublicPlayerPaymentView({
 
           {/* STEP 4: AMOUNT & NOTE CONFIRMATION */}
           <form onSubmit={handleSubmitPayment} className="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-5 space-y-4">
-            <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-emerald-400" />
-              4. Confirmar Monto y Detalle del Abono
-            </label>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-emerald-400" />
+                4. Confirmar Monto y Detalle del Abono
+              </label>
+              {ocrData?.amount && ocrData.amount === amount && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
+                  <Sparkles className="w-3 h-3 text-emerald-400" />
+                  Monto extraído por OCR
+                </span>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -443,13 +457,40 @@ export function PublicPlayerPaymentView({
                   <input
                     type="number"
                     required
-                    value={8500}
-                    readOnly
-                    className="w-full bg-zinc-950/50 border border-emerald-900/50 rounded-xl pl-8 pr-4 py-2.5 text-sm font-mono font-bold text-emerald-400 focus:outline-none cursor-not-allowed opacity-90 transition-all"
+                    min={100}
+                    step={100}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="8500"
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-xl pl-8 pr-4 py-2.5 text-sm font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500 transition-all"
                   />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-emerald-500/70 uppercase font-bold tracking-wider">
-                    Fijo
-                  </div>
+                </div>
+                {/* Preset shortcuts */}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setAmount(defaultMatchFee || 8500)}
+                    className="text-[11px] px-2 py-0.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+                  >
+                    1 cupo (${(defaultMatchFee || 8500).toLocaleString('es-CO')})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAmount((defaultMatchFee || 8500) * 2)}
+                    className="text-[11px] px-2 py-0.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+                  >
+                    2 cupos (${((defaultMatchFee || 8500) * 2).toLocaleString('es-CO')})
+                  </button>
+                  {ocrData?.amount && ocrData.amount !== amount && (
+                    <button
+                      type="button"
+                      onClick={() => setAmount(ocrData.amount!)}
+                      className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60 transition-colors flex items-center gap-1"
+                    >
+                      <Sparkles className="w-2.5 h-2.5" />
+                      OCR: ${ocrData.amount.toLocaleString('es-CO')}
+                    </button>
+                  )}
                 </div>
               </div>
 

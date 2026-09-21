@@ -13,6 +13,7 @@ import {
   GetMatchFinancialSummaryUseCase,
   GetAllPlayersFinancialOverviewUseCase,
   SettleMatchUseCase,
+  ProcessReceiptOcrUseCase,
 } from '../src/core/use-cases/index.ts';
 
 import {
@@ -250,6 +251,56 @@ describe('Phase 4: Player Wallet & Financial Module Use Cases', () => {
       const p2Item = overview.playerBalances.find((p) => p.playerId === 'p2');
       assert.equal(p2Item?.balance, -40000);
       assert.equal(p2Item?.status, 'DEBTOR');
+    });
+  });
+
+  describe('ProcessReceiptOcrUseCase', () => {
+    const ocrUseCase = new ProcessReceiptOcrUseCase();
+
+    it('should parse Nequi voucher with decimal cents $8.500,00 correctly without inflating', () => {
+      const sampleText = `
+        ¡Envío exitoso!
+        ¿Cuánto? $ 8.500,00
+        Para: Cesar Tellez
+        Disponible
+        Referencia: M12345678
+        Fecha: 21 Sep 2026 - 16:30
+      `;
+      const result = ocrUseCase.execute(sampleText);
+      assert.equal(result.detectedBank, 'NEQUI');
+      assert.equal(result.amount, 8500);
+      assert.equal(result.referenceNumber, 'M12345678');
+    });
+
+    it('should parse Bancolombia voucher with $17.000 (2 quotas) correctly', () => {
+      const sampleText = `
+        Transferencia Exitosa
+        Comprobante No. 000987654
+        Valor: $17.000
+        Cuenta destino: Ahorros ***415
+        Fecha: 21/09/2026
+      `;
+      const result = ocrUseCase.execute(sampleText);
+      assert.equal(result.detectedBank, 'BANCOLOMBIA');
+      assert.equal(result.amount, 17000);
+    });
+
+    it('should parse Daviplata voucher correctly', () => {
+      const sampleText = `
+        DaviPlata
+        Transacción Exitosa
+        Número de Autorización: 456789
+        ¿Cuánto enviaste? $ 8.500
+      `;
+      const result = ocrUseCase.execute(sampleText);
+      assert.equal(result.detectedBank, 'DAVIPLATA');
+      assert.equal(result.amount, 8500);
+    });
+
+    it('should handle empty or null text gracefully', () => {
+      const result = ocrUseCase.execute('');
+      assert.equal(result.detectedBank, 'OTHER');
+      assert.equal(result.amount, undefined);
     });
   });
 });
