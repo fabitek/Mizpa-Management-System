@@ -180,9 +180,7 @@ export function MatchSettlementCard({
 
   const basePitchFee = match
     ? isSettled
-      ? match.settledFeePerPlayer ?? 0
-      : attendedCount > 0
-      ? Math.ceil(match.pitchRentalCost / attendedCount)
+      ? (match.settledFeePerPlayer ?? (attendedCount > 0 ? Math.ceil(match.pitchRentalCost / attendedCount) : dynamicPitchFee))
       : dynamicPitchFee
     : 0;
 
@@ -2280,11 +2278,22 @@ export function MatchSettlementCard({
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="text-zinc-400 block mb-1 font-semibold">Monto Recibido ($ COP):</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-zinc-400 font-semibold">Monto Recibido ($ COP):</label>
+                  {cashModalPlayer.suggestedAmount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setCashAmount(cashModalPlayer.suggestedAmount)}
+                      className="text-[11px] text-emerald-400 hover:text-emerald-300 font-mono underline cursor-pointer"
+                    >
+                      Cuota sugerida: ${cashModalPlayer.suggestedAmount.toLocaleString('es-CO')}
+                    </button>
+                  )}
+                </div>
                 <input
                   type="number"
                   min="1000"
-                  step="1000"
+                  step="500"
                   value={cashAmount}
                   onChange={(e) => setCashAmount(Number(e.target.value))}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-base font-mono font-bold text-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
