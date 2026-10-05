@@ -71,16 +71,25 @@ export class SettleMatchUseCase {
       );
     }
 
-    // 3. Carga las asistencias del partido y filtra por jugadores con status 'ATTENDED' (excluye acompañantes que no juegan)
+    // 3. Carga las asistencias del partido y filtra por jugadores que jugaron (ATTENDED o CONFIRMED, excluyendo acompañantes y cancelados)
     const attendances = await this.attendanceRepository.findByMatchId(matchId);
-    const attendees = attendances.filter(
+    let attendees = attendances.filter(
       (attendance) => attendance.status === 'ATTENDED' && attendance.guestType !== 'COMPANION'
     );
+
+    // Si no se marcaron individualmente como ATTENDED o solo se marcó 1 por error habiendo más confirmados, usar nómina activa
+    const confirmedPlaying = attendances.filter(
+      (attendance) => (attendance.status === 'CONFIRMED' || attendance.status === 'ATTENDED') && attendance.guestType !== 'COMPANION'
+    );
+
+    if (attendees.length < confirmedPlaying.length && confirmedPlaying.length > 0) {
+      attendees = confirmedPlaying;
+    }
 
     // 4. Si no hay asistentes válidos, lanza InvalidAttendanceStateError.
     if (attendees.length === 0) {
       throw new InvalidAttendanceStateError(
-        `Cannot settle match '${matchId}': No attendees with 'ATTENDED' status found.`
+        `Cannot settle match '${matchId}': No attendees with 'ATTENDED' or 'CONFIRMED' status found.`
       );
     }
 

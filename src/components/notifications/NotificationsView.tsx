@@ -177,8 +177,6 @@ export function NotificationsView({
   const basePitchFee = currentMatch
     ? isSettled
       ? (currentMatch.settledFeePerPlayer ?? (attendedCount > 0 ? Math.ceil(currentMatch.pitchRentalCost / attendedCount) : fullCapacityPitchFee))
-      : attendedCount > 0
-      ? Math.ceil(currentMatch.pitchRentalCost / attendedCount)
       : confirmedCount > 0
       ? Math.ceil(currentMatch.pitchRentalCost / confirmedCount)
       : fullCapacityPitchFee
@@ -1075,7 +1073,7 @@ export function NotificationsView({
                         💵 Cuota Base: <strong className="text-emerald-400 font-mono">${basePitchFee.toLocaleString('es-CO')} COP</strong>
                       </Badge>
                       <Badge variant="outline" className="border-zinc-700 text-zinc-300 gap-1 py-1">
-                        👥 Asistentes: <strong className="text-white font-mono">{attendedCount || confirmedCount} jug.</strong>
+                        👥 Asistentes: <strong className="text-white font-mono">{isSettled ? attendedCount : (confirmedCount || attendedCount)} jug.</strong>
                       </Badge>
                     </div>
                   )}
