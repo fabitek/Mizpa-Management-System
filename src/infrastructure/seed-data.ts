@@ -79,9 +79,9 @@ export const initialPlayers: Player[] = [
 export const initialMatch: Match = {
   id: '39d4c9cc-af7e-407a-adae-a521ec2e728f',
   date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-  location: 'Cancha Sintética El Campín (Bogotá)',
-  locationAddress: 'Calle 53 # 30-15',
-  googleMapsUrl: 'https://maps.google.com',
+  location: 'Cancha Abedules de Santa Fe (Bogotá)',
+  locationAddress: 'Cra. 20 #185-58',
+  googleMapsUrl: 'https://maps.google.com/?q=Cra.+20+%23185-58,+Bogota',
   pitchRentalCost: 100000,
   extraCosts: 0,
   durationHours: 2,
