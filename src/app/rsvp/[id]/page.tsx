@@ -21,12 +21,33 @@ export default async function RsvpPage({ params }: RsvpPageProps) {
 
   let match = await matchRepository.findById(id);
 
-  // If match not found, render friendly message with redirect button
+  // Fallback 1: Si es el ID inicial estático
+  if (!match && initialMatch && id === initialMatch.id) {
+    match = initialMatch;
+  }
+
+  // Fallback 2: Si el ID no existe (p. ej. compartido en WhatsApp con ID viejo o no sincronizado),
+  // intentar resolver automáticamente el partido abierto más reciente para no romper la experiencia
   if (!match) {
-    if (initialMatch && id === initialMatch.id) {
-      match = initialMatch;
-    } else {
-      return (
+    try {
+      const allMatches = await matchRepository.findAll();
+      const openMatch = allMatches
+        .filter((m) => m.status === 'OPEN_REGISTRATION' || m.status === 'DRAFT')
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+      if (openMatch) {
+        match = openMatch;
+      } else if (initialMatch) {
+        match = initialMatch;
+      }
+    } catch (err) {
+      console.warn('Fallback match lookup failed:', err);
+    }
+  }
+
+  // If match still not found, render friendly message with redirect button
+  if (!match) {
+    return (
         <main className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-center space-y-4 shadow-2xl">
             <div className="w-14 h-14 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-2xl">
@@ -47,7 +68,6 @@ export default async function RsvpPage({ params }: RsvpPageProps) {
           </div>
         </main>
       );
-    }
   }
 
   let attendances: any[] = [];
