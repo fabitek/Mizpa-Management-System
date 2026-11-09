@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Player, IPlayerRepository, UserRole } from '../../../core/domain/index.ts';
+import { initialPlayers } from '../../seed-data.ts';
 
 interface PlayerRow {
   id: string;
@@ -19,6 +20,10 @@ function ensureUUID(id?: string | null): string {
   if (id && UUID_REGEX.test(id)) return id;
   return crypto.randomUUID();
 }
+
+const globalPlayerCache = new Map<string, Player>(
+  initialPlayers.map((p) => [p.id, { ...p }])
+);
 
 export class SupabasePlayerRepository implements IPlayerRepository {
   private client: SupabaseClient;
@@ -69,6 +74,15 @@ export class SupabasePlayerRepository implements IPlayerRepository {
   async findById(id: string): Promise<Player | null> {
     if (!id) return null;
 
+    const cached = globalPlayerCache.get(id);
+    if (cached) return cached;
+
+    const initial = initialPlayers.find((p) => p.id === id);
+    if (initial) {
+      globalPlayerCache.set(initial.id, initial);
+      return initial;
+    }
+
     try {
       if (UUID_REGEX.test(id)) {
         const { data, error } = await this.client
@@ -78,7 +92,9 @@ export class SupabasePlayerRepository implements IPlayerRepository {
           .maybeSingle();
 
         if (!error && data) {
-          return this.mapRowToEntity(data as PlayerRow);
+          const entity = this.mapRowToEntity(data as PlayerRow);
+          globalPlayerCache.set(entity.id, entity);
+          return entity;
         }
       }
 
@@ -90,13 +106,17 @@ export class SupabasePlayerRepository implements IPlayerRepository {
 
       if (!allErr && allPlayers) {
         const found = allPlayers.find((p: PlayerRow) => p.id === id);
-        if (found) return this.mapRowToEntity(found as PlayerRow);
+        if (found) {
+          const entity = this.mapRowToEntity(found as PlayerRow);
+          globalPlayerCache.set(entity.id, entity);
+          return entity;
+        }
       }
 
-      return null;
+      return globalPlayerCache.get(id) ?? null;
     } catch (err) {
       console.warn(`Supabase findById player exception for '${id}':`, err);
-      return null;
+      return globalPlayerCache.get(id) ?? null;
     }
   }
 
@@ -137,10 +157,19 @@ export class SupabasePlayerRepository implements IPlayerRepository {
         return [];
       }
 
-      return (data as PlayerRow[]).map((row) => this.mapRowToEntity(row));
+      const players = (data as PlayerRow[]).map((row) => this.mapRowToEntity(row));
+      for (const p of players) {
+        globalPlayerCache.set(p.id, p);
+      }
+      for (const p of initialPlayers) {
+        if (!players.some((pl) => pl.id === p.id)) {
+          players.push(p);
+        }
+      }
+      return players;
     } catch (err) {
       console.warn('Supabase findAll players exception:', err);
-      return [];
+      return Array.from(globalPlayerCache.values());
     }
   }
 

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Match, IMatchRepository, MatchStatus } from '../../../core/domain/index.ts';
+import { initialMatches, initialMatch } from '../../seed-data.ts';
 
 interface MatchRow {
   id: string;
@@ -31,7 +32,9 @@ function optionalUUID(id?: string | null): string | null {
   return null;
 }
 
-const globalMatchCache = new Map<string, Match>();
+const globalMatchCache = new Map<string, Match>(
+  initialMatches.map((m) => [m.id, { ...m }])
+);
 
 export class SupabaseMatchRepository implements IMatchRepository {
   private client: SupabaseClient;
@@ -87,8 +90,16 @@ export class SupabaseMatchRepository implements IMatchRepository {
   }
 
   async findById(id: string): Promise<Match | null> {
+    const cached = globalMatchCache.get(id);
+    if (cached) return cached;
+
+    if (initialMatch && id === initialMatch.id) {
+      globalMatchCache.set(initialMatch.id, initialMatch);
+      return initialMatch;
+    }
+
     if (!id || !UUID_REGEX.test(id)) {
-      return globalMatchCache.get(id) ?? null;
+      return null;
     }
     try {
       const { data, error } = await this.client
