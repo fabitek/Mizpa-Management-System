@@ -54,24 +54,40 @@ export class CheckAndNotifyCapacityReachedUseCase {
   ): Promise<CheckAndNotifyCapacityResult> {
     const { matchId, baseUrl, force = false, recipientGroup, recipientGate } = input;
 
-    // 1. Validar existencia del partido
-    const match = await this.matchRepository.findById(matchId);
+    // 1. Validar existencia del partido (con fallback si el ID no se encuentra)
+    let match = await this.matchRepository.findById(matchId);
+    if (!match) {
+      try {
+        const allMatches = await this.matchRepository.findAll();
+        const openMatch = allMatches
+          .filter((m) => m.status === 'OPEN_REGISTRATION' || m.status === 'DRAFT')
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+        if (openMatch) {
+          match = openMatch;
+        }
+      } catch (err) {
+        console.warn('Fallback match lookup in CheckAndNotifyCapacityReached failed:', err);
+      }
+    }
+
     if (!match) {
       throw new MatchNotFoundError(`Match with ID '${matchId}' not found.`);
     }
+
+    const effectiveMatchId = match.id;
 
     // 2. Control de Idempotencia: no reenviar si ya fue notificado (a menos que se fuerce)
     if (match.notificationSent10Players && !force) {
       return {
         triggered: false,
-        matchId,
+        matchId: effectiveMatchId,
         confirmedCount: 0,
         reason: 'ALREADY_SENT',
       };
     }
 
     // 3. Obtener asistencias del partido y filtrar confirmadas
-    const allAttendances = await this.attendanceRepository.findByMatchId(matchId);
+    const allAttendances = await this.attendanceRepository.findByMatchId(effectiveMatchId);
 
     // Contar todas las confirmadas y presentes (tanto jugadores titulares como invitados/acompañantes con cupo)
     const confirmedAttendances = allAttendances

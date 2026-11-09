@@ -49,21 +49,37 @@ export class RegisterAttendanceUseCase {
   async execute(input: RegisterAttendanceInput): Promise<RegisterAttendanceResult> {
     const { matchId, playerId, guestName, guestType, registeredAt = new Date() } = input;
 
-    // 1. Validar que el partido exista
-    const match = await this.matchRepository.findById(matchId);
+    // 1. Validar que el partido exista (con fallback resiliente si el ID cambió o no se sincronizó)
+    let match = await this.matchRepository.findById(matchId);
+    if (!match) {
+      try {
+        const allMatches = await this.matchRepository.findAll();
+        const openMatch = allMatches
+          .filter((m) => m.status === 'OPEN_REGISTRATION' || m.status === 'DRAFT')
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+        if (openMatch) {
+          match = openMatch;
+        }
+      } catch (err) {
+        console.warn('Fallback match lookup in RegisterAttendance failed:', err);
+      }
+    }
+
     if (!match) {
       throw new MatchNotFoundError(`Match with ID '${matchId}' not found.`);
     }
 
+    const effectiveMatchId = match.id;
+
     // 2. Validar que el partido esté abierto para inscripciones
     if (match.status !== 'OPEN_REGISTRATION') {
       throw new MatchRegistrationClosedError(
-        `Cannot register for match '${matchId}': Status is '${match.status}'.`
+        `Cannot register for match '${effectiveMatchId}': Status is '${match.status}'.`
       );
     }
 
     // 3. Obtener asistencias actuales del partido
-    const currentAttendances = await this.attendanceRepository.findByMatchId(matchId);
+    const currentAttendances = await this.attendanceRepository.findByMatchId(effectiveMatchId);
 
     const isGuest = Boolean(guestName && guestName.trim().length > 0);
     const resolvedGuestType: 'PLAYER' | 'COMPANION' | undefined = isGuest
@@ -151,7 +167,7 @@ export class RegisterAttendanceUseCase {
 
     const newAttendance: Attendance = {
       id: attendanceId,
-      matchId,
+      matchId: effectiveMatchId,
       playerId,
       status,
       registeredAt,
