@@ -78,7 +78,7 @@ export const initialPlayers: Player[] = [
 
 export const initialMatch: Match = {
   id: '39d4c9cc-af7e-407a-adae-a521ec2e728f',
-  date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+  date: new Date('2026-11-10T20:00:00-05:00'),
   location: 'Cancha Abedules de Santa Fe (Bogotá)',
   locationAddress: 'Cra. 20 #185-58',
   googleMapsUrl: 'https://maps.google.com/?q=Cra.+20+%23185-58,+Bogota',
