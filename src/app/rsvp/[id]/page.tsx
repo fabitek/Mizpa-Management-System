@@ -71,24 +71,20 @@ export default async function RsvpPage({ params }: RsvpPageProps) {
   }
 
   let attendances: any[] = [];
-  try {
-    const reconciled = await reconcileMatchAttendancesUseCase.execute(match.id);
-    attendances = reconciled.allAttendances;
-  } catch (err) {
-    console.warn('RsvpPage attendances auto-reconcile warning:', err);
-    try {
-      attendances = await attendanceRepository.findByMatchId(match.id);
-    } catch (attErr) {
-      console.warn('RsvpPage attendances warning:', attErr);
-    }
+  let playersList = initialPlayers;
+
+  const [attendancesRes, playersRes] = await Promise.allSettled([
+    reconcileMatchAttendancesUseCase.execute(match.id).catch(() => attendanceRepository.findByMatchId(match.id)),
+    playerRepository.findAll(),
+  ]);
+
+  if (attendancesRes.status === 'fulfilled') {
+    const val = attendancesRes.value as any;
+    attendances = val?.allAttendances ?? (Array.isArray(val) ? val : []);
   }
 
-  let playersList = initialPlayers;
-  try {
-    const dbPlayers = await playerRepository.findAll();
-    if (dbPlayers.length > 0) playersList = dbPlayers;
-  } catch (err) {
-    console.warn('RsvpPage players warning:', err);
+  if (playersRes.status === 'fulfilled' && playersRes.value && playersRes.value.length > 0) {
+    playersList = playersRes.value;
   }
 
   return (

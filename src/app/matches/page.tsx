@@ -13,28 +13,16 @@ import type { Match, Player, Attendance, FinancialEntry } from '../../core/domai
 export const dynamic = 'force-dynamic';
 
 export default async function MatchesPage() {
-  let allMatches: Match[] = [];
-  let dbPlayers: Player[] = [];
+  const [matchesRes, playersRes, financeRes] = await Promise.allSettled([
+    matchRepository.findAll(),
+    playerRepository.findAll(),
+    financeRepository.getAllEntries(),
+  ]);
+
+  const allMatches: Match[] = matchesRes.status === 'fulfilled' ? matchesRes.value : [];
+  const dbPlayers: Player[] = playersRes.status === 'fulfilled' ? playersRes.value : [];
+  const financialEntries: FinancialEntry[] = financeRes.status === 'fulfilled' ? financeRes.value : [];
   let attendances: Attendance[] = [];
-  let financialEntries: FinancialEntry[] = [];
-
-  try {
-    allMatches = await matchRepository.findAll();
-  } catch (err) {
-    console.warn('MatchesPage matchRepository.findAll warning:', err);
-  }
-
-  try {
-    dbPlayers = await playerRepository.findAll();
-  } catch (err) {
-    console.warn('MatchesPage playerRepository.findAll warning:', err);
-  }
-
-  try {
-    financialEntries = await financeRepository.getAllEntries();
-  } catch (err) {
-    console.warn('MatchesPage financeRepository.getAllEntries warning:', err);
-  }
 
   const sortedMatches = [...allMatches].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const match = sortedMatches.length > 0 ? sortedMatches[0] : null;

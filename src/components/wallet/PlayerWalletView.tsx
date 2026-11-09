@@ -707,6 +707,8 @@ export function PlayerWalletView({
               <img
                 src={previewModalUrl}
                 alt="Comprobante bancario"
+                loading="lazy"
+                decoding="async"
                 className="max-h-[60vh] max-w-full rounded-lg object-contain shadow-md"
               />
             </div>

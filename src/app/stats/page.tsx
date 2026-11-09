@@ -13,26 +13,14 @@ import type { PlayerPerformanceStats } from '../../core/domain/types.ts';
 export const dynamic = 'force-dynamic';
 
 export default async function StatsPage() {
-  let players: any[] = [];
-  let allMatches: any[] = [];
+  const [playersRes, matchesRes] = await Promise.allSettled([
+    playerRepository.findAll(),
+    matchRepository.findAll(),
+  ]);
 
-  try {
-    const dbPlayers = await playerRepository.findAll();
-    if (dbPlayers && dbPlayers.length > 0) {
-      players = dbPlayers;
-    } else {
-      players = initialPlayers;
-    }
-  } catch (err) {
-    console.warn('StatsPage players warning:', err);
-    players = initialPlayers;
-  }
-
-  try {
-    allMatches = await matchRepository.findAll();
-  } catch (err) {
-    console.warn('StatsPage matches warning:', err);
-  }
+  const dbPlayers = playersRes.status === 'fulfilled' ? playersRes.value : [];
+  const players = dbPlayers && dbPlayers.length > 0 ? dbPlayers : initialPlayers;
+  const allMatches = matchesRes.status === 'fulfilled' ? matchesRes.value : [];
 
   const activeMatch = allMatches.length > 0
     ? [...allMatches].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]

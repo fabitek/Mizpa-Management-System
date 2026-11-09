@@ -505,6 +505,8 @@ export function OperatingExpensesCard({
               <img
                 src={previewModalUrl}
                 alt="Comprobante de gasto"
+                loading="lazy"
+                decoding="async"
                 className="max-h-[60vh] max-w-full rounded-lg object-contain shadow-md"
               />
             </div>

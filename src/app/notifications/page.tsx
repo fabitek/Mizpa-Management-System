@@ -11,47 +11,20 @@ import { NotificationsView } from '../../components/notifications/NotificationsV
 export const dynamic = 'force-dynamic';
 
 export default async function NotificationsPage() {
-  let notifications: any[] = [];
-  let allMatches: any[] = [];
-  let players: any[] = [];
-  let attendances: any[] = [];
-  let financialEntries: any[] = [];
+  const [notifsRes, matchesRes, playersRes, attendancesRes, financeRes] = await Promise.allSettled([
+    getNotificationsLogUseCase.execute(),
+    matchRepository.findAll(),
+    playerRepository.findAll(),
+    attendanceRepository.findAll(),
+    financeRepository.getAllEntries(),
+  ]);
 
-  try {
-    notifications = await getNotificationsLogUseCase.execute();
-  } catch (err) {
-    console.warn('NotificationsPage notifications warning:', err);
-  }
-
-  try {
-    allMatches = await matchRepository.findAll();
-  } catch (err) {
-    console.warn('NotificationsPage matches warning:', err);
-  }
-
-  try {
-    const dbPlayers = await playerRepository.findAll();
-    if (dbPlayers && dbPlayers.length > 0) {
-      players = dbPlayers;
-    } else {
-      players = initialPlayers;
-    }
-  } catch (err) {
-    console.warn('NotificationsPage players warning:', err);
-    players = initialPlayers;
-  }
-
-  try {
-    attendances = await attendanceRepository.findAll();
-  } catch (err) {
-    console.warn('NotificationsPage attendances warning:', err);
-  }
-
-  try {
-    financialEntries = await financeRepository.getAllEntries();
-  } catch (err) {
-    console.warn('NotificationsPage financialEntries warning:', err);
-  }
+  const notifications = notifsRes.status === 'fulfilled' ? notifsRes.value : [];
+  const allMatches = matchesRes.status === 'fulfilled' ? matchesRes.value : [];
+  const dbPlayers = playersRes.status === 'fulfilled' ? playersRes.value : [];
+  const players = dbPlayers && dbPlayers.length > 0 ? dbPlayers : initialPlayers;
+  const attendances = attendancesRes.status === 'fulfilled' ? attendancesRes.value : [];
+  const financialEntries = financeRes.status === 'fulfilled' ? financeRes.value : [];
   
   // Sort matches by createdAt descending (newest first)
   const sortedMatches = [...allMatches].sort(

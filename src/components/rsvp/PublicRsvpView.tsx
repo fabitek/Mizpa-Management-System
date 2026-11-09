@@ -804,6 +804,10 @@ export function PublicRsvpView({
                       <img
                         src="/images/qr-payment.jpg"
                         alt="Código QR Bre-B Nequi Cesar Tellez @3123578415"
+                        width={224}
+                        height={224}
+                        loading="lazy"
+                        decoding="async"
                         className="w-56 h-auto rounded-xl object-contain mx-auto"
                       />
                     </div>
